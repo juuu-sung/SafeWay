@@ -177,7 +177,7 @@ SafeWay/
 
 Android Studio에서 프로젝트 루트 폴더를 열고 Gradle Sync를 실행합니다.
 
-앱용 카카오 키는 루트의 `local.properties`에 넣습니다. 이 파일은 GitHub에 올리지 않습니다.
+앱용 카카오 키는 루트의 `local.properties`에 넣습니다.
 
 ```properties
 KAKAO_NATIVE_APP_KEY=your-kakao-native-app-key
@@ -200,7 +200,7 @@ npm install
 cp .env.example .env
 ```
 
-`server/.env`에 필요한 값을 채웁니다. 이 파일도 GitHub에 올리지 않습니다.
+`server/.env`에 필요한 값을 채웁니다.
 
 ```env
 PORT=8080
@@ -262,8 +262,6 @@ app/build/outputs/apk/debug/app-debug.apk
 
 ## 보안 주의
 
-GitHub에는 아래 파일을 올리지 않습니다.
-
 - `local.properties`
 - `app/google-services.json`
 - `server/.env`
@@ -271,13 +269,3 @@ GitHub에는 아래 파일을 올리지 않습니다.
 - `server/data/*.json`
 - 빌드 산출물, 압축본, 힙 덤프, `node_modules`
 
-API 키가 실수로 커밋됐다면 해당 키를 즉시 재발급하고 Git 기록에서도 제거해야 합니다.
-
-## 참고한 README 구성
-
-국내 프로젝트 README에서 시스템 아키텍처, 데이터 흐름, 화면 흐름도를 Mermaid로 분리해 보여주는 구성을 참고했습니다.
-
-- [kookmin-sw/2026-capstone-56](https://github.com/kookmin-sw/2026-capstone-56)
-- [CSID-DGU/2026-1-CECD1-5-Artifact-9](https://github.com/CSID-DGU/2026-1-CECD1-5-Artifact-9)
-- [SKNETWORKS-FAMILY-AICAMP/SKN23-FINAL-3Team](https://github.com/SKNETWORKS-FAMILY-AICAMP/SKN23-FINAL-3Team)
-- [sch0718/landmark](https://github.com/sch0718/landmark)

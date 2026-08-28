@@ -3,6 +3,32 @@
 여성·학생 안심귀가를 위한 Android 안전 동행 앱입니다. 사용자가 귀가를 시작하면 현재 위치와 도보 경로를 기록하고, 보호자는 별도 모니터 화면에서 사용자의 실시간 위치와 경로 상태를 확인할 수 있습니다.
 
 <p align="center">
+  <a href="https://github.com/juuu-sung/SafeWay">
+    <img src="https://img.shields.io/badge/GitHub-SafeWay-24292f?style=for-the-badge&logo=github&logoColor=white" alt="GitHub repository">
+  </a>
+  <a href="#실행-준비">
+    <img src="https://img.shields.io/badge/Setup-Guide-6C63FF?style=for-the-badge" alt="Setup guide">
+  </a>
+  <a href="server/README.md">
+    <img src="https://img.shields.io/badge/Server-API-16a36f?style=for-the-badge&logo=node.js&logoColor=white" alt="Server API">
+  </a>
+  <a href="#동작-흐름">
+    <img src="https://img.shields.io/badge/Workflow-Diagram-2f80ed?style=for-the-badge" alt="Workflow diagram">
+  </a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Android-API%2026%2B-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Android API 26+">
+  <img src="https://img.shields.io/badge/Java-17-007396?style=flat-square&logo=openjdk&logoColor=white" alt="Java 17">
+  <img src="https://img.shields.io/badge/Kotlin-Android-7F52FF?style=flat-square&logo=kotlin&logoColor=white" alt="Kotlin Android">
+  <img src="https://img.shields.io/badge/Node.js-Express-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node.js Express">
+  <img src="https://img.shields.io/badge/Firebase-FCM-FFCA28?style=flat-square&logo=firebase&logoColor=black" alt="Firebase Cloud Messaging">
+  <img src="https://img.shields.io/badge/Kakao-Maps-FFCD00?style=flat-square&logo=kakao&logoColor=black" alt="Kakao Maps">
+  <img src="https://img.shields.io/badge/OpenAI-API-412991?style=flat-square&logo=openai&logoColor=white" alt="OpenAI API">
+  <img src="https://img.shields.io/badge/SQLite-Local%20DB-003B57?style=flat-square&logo=sqlite&logoColor=white" alt="SQLite local database">
+</p>
+
+<p align="center">
   <img src="design/safeway-android-ui.png" alt="SafeWay Android UI preview" width="720">
 </p>
 

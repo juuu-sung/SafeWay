@@ -22,18 +22,96 @@
 
 ```mermaid
 flowchart LR
-    User["사용자 앱"] --> Start["안심귀가 시작"]
-    Start --> LocationService["ReturnLocationService"]
-    LocationService --> UpdateApi["/alerts/return-location-update"]
-    UpdateApi --> StateStore["서버 귀가 상태 저장"]
-    StateStore --> Guardian["보호자 모니터"]
-    Guardian --> Poll["5초마다 /guardians/status 조회"]
-    Start --> StartAlert["시작 알림 FCM"]
-    LocationService --> Deviation["경로 이탈 감지"]
-    Deviation --> Push["위험 알림 FCM"]
+    classDef mobile fill:#eaf3ff,stroke:#2f80ed,stroke-width:1.5px,color:#102a43
+    classDef server fill:#eef8f2,stroke:#16a36f,stroke-width:1.5px,color:#123524
+    classDef alert fill:#fff4df,stroke:#f59e0b,stroke-width:1.5px,color:#3f2a05
+    classDef danger fill:#ffe8e8,stroke:#e5484d,stroke-width:1.5px,color:#451a1a
+    classDef store fill:#f3efff,stroke:#7c3aed,stroke-width:1.5px,color:#24124d
+    classDef external fill:#f5f7fa,stroke:#64748b,stroke-width:1.5px,color:#1f2937
+
+    subgraph UserApp["사용자 앱"]
+        RouteSetup["도착지 설정<br/>Kakao Local 검색 또는 지도 선택"]
+        AiCall["AI 안심 동행 통화<br/>음성 입력과 TTS 재생"]
+        ReturnStart["안심귀가 시작"]
+        LocationService["ReturnLocationService<br/>3초/5m 기준 위치 수집"]
+        LocalRecord["실제 이동 경로 기록<br/>SharedPreferences"]
+        DeviationCheck{"경로 이탈 또는<br/>위험 신호 감지"}
+        Complete["귀가 완료"]
+    end
+
+    subgraph SafeWayServer["SafeWay 서버"]
+        RouteApi["/routes/compute<br/>도보 경로 계산"]
+        AiApi["/ai/chat · /ai/speech<br/>AI 응답과 음성 생성"]
+        StartedApi["/alerts/return-started<br/>시작 상태 저장"]
+        LiveApi["/alerts/return-location-update<br/>최신 위치 조용히 갱신"]
+        DangerApi["/alerts/route-deviation<br/>/alerts/ai-danger"]
+        CompleteApi["/alerts/return-completed<br/>완료 상태 저장"]
+        StateStore[("guardian-return-states<br/>최신 상태 + 히스토리")]
+        StatusApi["/guardians/status<br/>보호자 상태 조회"]
+    end
+
+    subgraph GuardianApp["보호자 앱"]
+        PushReceiver["SafeWayMessagingService<br/>시작/위험/완료 알림 수신"]
+        Monitor["GuardianMonitorActivity<br/>지도와 상태 카드 표시"]
+        AutoRefresh["5초마다 자동 새로고침"]
+    end
+
+    subgraph External["외부 서비스"]
+        Kakao["Kakao Maps / Local / Mobility"]
+        Firebase["Firebase Cloud Messaging"]
+        OpenAI["OpenAI API<br/>AI 동행 대화와 TTS"]
+    end
+
+    RouteSetup --> ReturnStart
+    RouteSetup -.-> RouteApi
+    RouteApi -.-> Kakao
+    AiCall -.-> AiApi
+    AiApi -.-> OpenAI
+    AiCall --> DeviationCheck
+    ReturnStart --> LocationService
+    LocationService --> LocalRecord
+    LocationService -->|5초/5m 제한| LiveApi
+    LocationService --> DeviationCheck
+    LocationService --> Complete
+    DeviationCheck -->|정상 이동| LiveApi
+    DeviationCheck -->|경로 이탈·위험 감지| DangerApi
+    ReturnStart --> StartedApi
+    Complete --> CompleteApi
+
+    StartedApi --> StateStore
+    LiveApi --> StateStore
+    DangerApi --> StateStore
+    CompleteApi --> StateStore
+    StateStore --> StatusApi
+    StatusApi --> AutoRefresh
+    AutoRefresh --> Monitor
+
+    StartedApi -->|FCM data push| Firebase
+    DangerApi -->|FCM data push| Firebase
+    CompleteApi -->|FCM data push| Firebase
+    Firebase --> PushReceiver
+    PushReceiver --> Monitor
+
+    RouteSetup -.-> Kakao
+    DangerApi -.-> Kakao
+
+    class RouteSetup,AiCall,ReturnStart,LocationService,LocalRecord,Complete mobile
+    class RouteApi,AiApi,StartedApi,LiveApi,DangerApi,CompleteApi,StatusApi server
+    class PushReceiver,Monitor,AutoRefresh mobile
+    class DeviationCheck danger
+    class StateStore store
+    class Firebase alert
+    class Kakao,OpenAI external
 ```
 
 실시간 위치는 보호자 휴대폰에 푸시 알림을 계속 띄우지 않습니다. 사용자 기기가 위치를 서버에 갱신하고, 보호자 화면이 최신 상태를 자동 조회해 지도 위치를 갱신합니다.
+
+| 흐름 | 처리 방식 |
+| --- | --- |
+| 시작/위험/완료 알림 | Firebase Cloud Messaging으로 보호자에게 즉시 전송 |
+| 실시간 위치 | 사용자 앱이 서버에 조용히 갱신하고 보호자 앱이 5초마다 조회 |
+| 이동 경로 기록 | 사용자 앱 내부에 실제 이동 좌표를 누적 저장 |
+| 경로 이탈 | 기준 경로와 현재 위치의 거리 차이를 계산해 보호자에게 위험 알림 |
 
 ## 기술 스택
 
@@ -137,12 +215,14 @@ app/build/outputs/apk/debug/app-debug.apk
 | `POST` | `/guardians/pairing-code` | 보호자 기기에서 6자리 연동 코드 생성 |
 | `POST` | `/guardians/link` | 사용자 기기에서 보호자 연동 코드 등록 |
 | `POST` | `/guardians/status` | 보호자 모니터가 최신 귀가 상태 조회 |
+| `POST` | `/routes/compute` | 카카오 기반 도보 경로 계산 |
 | `POST` | `/alerts/return-started` | 안심귀가 시작 알림 전송 |
 | `POST` | `/alerts/return-location-update` | 안심귀가 중 실시간 위치 갱신 |
 | `POST` | `/alerts/route-deviation` | 경로 이탈 알림 전송 |
 | `POST` | `/alerts/return-completed` | 귀가 완료 알림 전송 |
 | `POST` | `/ai/chat` | AI 안심 동행 대화 응답 |
-| `POST` | `/ai/tts` | TTS 음성 응답 생성 |
+| `POST` | `/ai/speech` | TTS 음성 응답 생성 |
+| `POST` | `/ai/summary` | AI 통화 기록 요약 |
 
 자세한 요청 예시는 `server/README.md`에 정리되어 있습니다.
 
@@ -169,9 +249,9 @@ API 키가 실수로 커밋됐다면 해당 키를 즉시 재발급하고 Git �
 
 ## 참고한 README 구성
 
-비슷한 안전 앱 저장소들의 README 구성을 참고해 기능 소개, 기술 스택, 설치 방법, 권한, Firebase/API 설정, 데이터 흐름을 한 화면에서 확인할 수 있도록 정리했습니다.
+국내 프로젝트 README에서 시스템 아키텍처, 데이터 흐름, 화면 흐름도를 Mermaid로 분리해 보여주는 구성을 참고했습니다.
 
-- Guardian App
-- Guardian - The Safety App
-- SafeGuardHer
-- Parental Control Android Application
+- [kookmin-sw/2026-capstone-56](https://github.com/kookmin-sw/2026-capstone-56)
+- [CSID-DGU/2026-1-CECD1-5-Artifact-9](https://github.com/CSID-DGU/2026-1-CECD1-5-Artifact-9)
+- [SKNETWORKS-FAMILY-AICAMP/SKN23-FINAL-3Team](https://github.com/SKNETWORKS-FAMILY-AICAMP/SKN23-FINAL-3Team)
+- [sch0718/landmark](https://github.com/sch0718/landmark)

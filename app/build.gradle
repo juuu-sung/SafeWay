@@ -1,0 +1,54 @@
+apply plugin: 'com.android.application'
+apply plugin: 'org.jetbrains.kotlin.android'
+
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withInputStream { localProperties.load(it) }
+}
+def kakaoNativeAppKey = localProperties.getProperty("KAKAO_NATIVE_APP_KEY", "")
+def kakaoRestApiKey = localProperties.getProperty("KAKAO_REST_API_KEY", "")
+
+if (file("google-services.json").exists()) {
+    apply plugin: 'com.google.gms.google-services'
+}
+
+android {
+    namespace 'com.safeway.app'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.safeway.app"
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName "1.0"
+        buildConfigField "String", "KAKAO_NATIVE_APP_KEY", "\"${kakaoNativeAppKey}\""
+        buildConfigField "String", "KAKAO_REST_API_KEY", "\"${kakaoRestApiKey}\""
+    }
+
+    buildFeatures {
+        buildConfig true
+        viewBinding true
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.9.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.databinding:viewbinding:8.12.0'
+    implementation 'com.kakao.maps.open:android:2.13.2'
+    implementation 'com.kakaomobility.knsdk:knsdk_ui:1.12.7'
+    implementation platform('com.google.firebase:firebase-bom:34.7.0')
+    implementation 'com.google.firebase:firebase-messaging'
+}

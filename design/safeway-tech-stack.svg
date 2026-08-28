@@ -1,0 +1,136 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2420" height="1006" viewBox="0 0 2420 1006">
+  <defs>
+    <style>
+      .font { font-family: "Apple SD Gothic Neo", "Noto Sans KR", Pretendard, Inter, Arial, sans-serif; }
+      .title { font-size: 34px; font-weight: 800; letter-spacing: 0; }
+      .body { font-size: 27px; font-weight: 650; fill: #3F4250; letter-spacing: 0; }
+      .body-strong { font-size: 27px; font-weight: 800; fill: #242633; letter-spacing: 0; }
+      .caption { font-size: 18px; font-weight: 800; fill: #89828F; letter-spacing: 0; }
+      .line-icon { fill: none; stroke: currentColor; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
+    </style>
+    <filter id="cardShadow" x="-12%" y="-14%" width="124%" height="132%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#B77A8A" flood-opacity="0.13"/>
+    </filter>
+    <symbol id="icon-android" viewBox="0 0 40 40">
+      <path class="line-icon" d="M11 18h18v11a4 4 0 0 1-4 4H15a4 4 0 0 1-4-4V18Z"/>
+      <path class="line-icon" d="M14 18c.8-5 4-8 6-8s5.2 3 6 8"/>
+      <path class="line-icon" d="M14 8 10 4M26 8l4-4M8 21v8M32 21v8"/>
+      <path class="line-icon" d="M17 15h.1M23 15h.1"/>
+    </symbol>
+    <symbol id="icon-storage" viewBox="0 0 40 40">
+      <ellipse class="line-icon" cx="20" cy="10" rx="12" ry="5"/>
+      <path class="line-icon" d="M8 10v10c0 2.8 5.4 5 12 5s12-2.2 12-5V10"/>
+      <path class="line-icon" d="M8 20v10c0 2.8 5.4 5 12 5s12-2.2 12-5V20"/>
+    </symbol>
+    <symbol id="icon-map" viewBox="0 0 40 40">
+      <path class="line-icon" d="M6 11 16 6l8 4 10-5v24l-10 5-8-4-10 5V11Z"/>
+      <path class="line-icon" d="M16 6v24M24 10v24"/>
+      <path class="line-icon" d="M11 20h.1M29 18h.1"/>
+    </symbol>
+    <symbol id="icon-bell" viewBox="0 0 40 40">
+      <path class="line-icon" d="M10 28h20c-2.5-3-3.5-5.6-3.5-12a6.5 6.5 0 0 0-13 0c0 6.4-1 9-3.5 12Z"/>
+      <path class="line-icon" d="M17 32a3.3 3.3 0 0 0 6 0M20 6V3"/>
+    </symbol>
+    <symbol id="icon-server" viewBox="0 0 40 40">
+      <rect class="line-icon" x="7" y="8" width="26" height="9" rx="3"/>
+      <rect class="line-icon" x="7" y="23" width="26" height="9" rx="3"/>
+      <path class="line-icon" d="M13 12.5h.1M13 27.5h.1M21 17v6"/>
+    </symbol>
+    <symbol id="icon-mic" viewBox="0 0 40 40">
+      <rect class="line-icon" x="15" y="5" width="10" height="20" rx="5"/>
+      <path class="line-icon" d="M9 18c0 6.5 4.6 11 11 11s11-4.5 11-11M20 29v6"/>
+    </symbol>
+    <symbol id="icon-phone" viewBox="0 0 40 40">
+      <path class="line-icon" d="M13 7 18 14l-4 4c2 5 5 8 10 10l4-4 6 5-2 6C16 36 4 24 5 9l8-2Z"/>
+    </symbol>
+    <symbol id="icon-ai" viewBox="0 0 40 40">
+      <rect class="line-icon" x="9" y="12" width="22" height="17" rx="7"/>
+      <path class="line-icon" d="M15 12V7M25 12V7M14 34h12M20 29v5"/>
+      <path class="line-icon" d="M16 20h.1M24 20h.1M16 25c2.2 1.8 5.8 1.8 8 0"/>
+    </symbol>
+  </defs>
+
+  <rect width="2420" height="1006" fill="#F8F4EB"/>
+
+  <g class="font">
+    <g transform="translate(64 42)">
+      <rect width="540" height="433" rx="22" fill="#FFFFFF" stroke="#F1E7EC" filter="url(#cardShadow)"/>
+      <g transform="translate(49 54)" color="#F36F91"><use href="#icon-android" width="40" height="40"/></g>
+      <text class="title" x="104" y="86" fill="#F36F91">Android 앱</text>
+      <text class="body" x="78" y="181">Java / Kotlin</text>
+      <text class="body" x="78" y="237">XML Layout + ViewBinding</text>
+      <text class="body" x="78" y="293">AppCompat + Material</text>
+      <text class="body" x="78" y="349">minSdk 26 / targetSdk 35</text>
+    </g>
+
+    <g transform="translate(648 42)">
+      <rect width="540" height="433" rx="22" fill="#FFFFFF" stroke="#F1E7EC" filter="url(#cardShadow)"/>
+      <g transform="translate(49 54)" color="#2FAE9B"><use href="#icon-storage" width="40" height="40"/></g>
+      <text class="title" x="104" y="86" fill="#2FAE9B">저장·상태</text>
+      <text class="body" x="78" y="181">SharedPreferences</text>
+      <text class="body" x="78" y="237">SQLiteOpenHelper</text>
+      <text class="body" x="78" y="293">guardian-return-states.json</text>
+      <text class="body" x="78" y="349">귀가 기록 / 위험 메모</text>
+    </g>
+
+    <g transform="translate(1232 42)">
+      <rect width="540" height="433" rx="22" fill="#FFFFFF" stroke="#F1E7EC" filter="url(#cardShadow)"/>
+      <g transform="translate(49 54)" color="#5547A8"><use href="#icon-map" width="40" height="40"/></g>
+      <text class="title" x="104" y="86" fill="#5547A8">위치·지도</text>
+      <text class="body" x="78" y="181">KakaoMaps SDK v2</text>
+      <text class="body" x="78" y="237">Kakao Local API</text>
+      <text class="body" x="78" y="293">Kakao Mobility Directions</text>
+      <text class="body" x="78" y="349">KNSDK 내비게이션</text>
+    </g>
+
+    <g transform="translate(1816 42)">
+      <rect width="540" height="433" rx="22" fill="#FFFFFF" stroke="#F1E7EC" filter="url(#cardShadow)"/>
+      <g transform="translate(49 54)" color="#F47C7C"><use href="#icon-bell" width="40" height="40"/></g>
+      <text class="title" x="104" y="86" fill="#F47C7C">보호자 알림</text>
+      <text class="body" x="78" y="181">Firebase Cloud Messaging</text>
+      <text class="body" x="78" y="237">firebase-admin</text>
+      <text class="body" x="78" y="293">기기 토큰 + 6자리 연동</text>
+      <text class="body" x="78" y="349">귀가·이탈·AI 위험 푸시</text>
+    </g>
+
+    <g transform="translate(64 531)">
+      <rect width="540" height="433" rx="22" fill="#FFFFFF" stroke="#F1E7EC" filter="url(#cardShadow)"/>
+      <g transform="translate(49 54)" color="#2A3142"><use href="#icon-server" width="40" height="40"/></g>
+      <text class="title" x="104" y="86" fill="#2A3142">서버 Backend</text>
+      <text class="body" x="78" y="181">Node.js Express</text>
+      <text class="body" x="78" y="237">REST JSON API</text>
+      <text class="body" x="78" y="293">dotenv + 환경 키 관리</text>
+      <text class="body" x="78" y="349">Kakao / OpenAI 프록시</text>
+    </g>
+
+    <g transform="translate(648 531)">
+      <rect width="540" height="433" rx="22" fill="#FFFFFF" stroke="#F1E7EC" filter="url(#cardShadow)"/>
+      <g transform="translate(49 54)" color="#F36F91"><use href="#icon-mic" width="40" height="40"/></g>
+      <text class="title" x="104" y="86" fill="#F36F91">음성 UX</text>
+      <text class="body" x="78" y="181">SpeechRecognizer</text>
+      <text class="body" x="78" y="237">OpenAI TTS MP3</text>
+      <text class="body" x="78" y="293">TextToSpeech fallback</text>
+      <text class="body" x="78" y="349">MediaPlayer 재생</text>
+    </g>
+
+    <g transform="translate(1232 531)">
+      <rect width="540" height="433" rx="22" fill="#FFFFFF" stroke="#F1E7EC" filter="url(#cardShadow)"/>
+      <g transform="translate(49 54)" color="#E5484D"><use href="#icon-phone" width="40" height="40"/></g>
+      <text class="title" x="104" y="86" fill="#E5484D">전화·긴급</text>
+      <text class="body" x="78" y="181">Intent ACTION_DIAL</text>
+      <text class="body" x="78" y="237">112 연결</text>
+      <text class="body" x="78" y="293">보호자 전화</text>
+      <text class="body" x="78" y="349">긴급 음성 안내</text>
+    </g>
+
+    <g transform="translate(1816 531)">
+      <rect width="540" height="433" rx="22" fill="#FFFFFF" stroke="#F1E7EC" filter="url(#cardShadow)"/>
+      <g transform="translate(49 54)" color="#5547A8"><use href="#icon-ai" width="40" height="40"/></g>
+      <text class="title" x="104" y="86" fill="#5547A8">AI 안심 통화</text>
+      <text class="body" x="78" y="181">OpenAI Responses API</text>
+      <text class="body-strong" x="78" y="237">기본 모델 gpt-5.2</text>
+      <text class="body" x="78" y="293">위험도 판단 + 안전 액션</text>
+      <text class="body" x="78" y="349">대화 요약 저장</text>
+    </g>
+  </g>
+</svg>

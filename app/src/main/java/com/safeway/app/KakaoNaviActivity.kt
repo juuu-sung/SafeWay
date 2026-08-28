@@ -1,0 +1,339 @@
+package com.safeway.app
+
+import android.Manifest
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Bundle
+import android.provider.Settings
+import android.view.View
+import android.widget.FrameLayout
+import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import com.kakaomobility.knsdk.KNLanguageType
+import com.kakaomobility.knsdk.KNRouteAvoidOption
+import com.kakaomobility.knsdk.KNRoutePriority
+import com.kakaomobility.knsdk.KNSDK
+import com.kakaomobility.knsdk.common.objects.KNError
+import com.kakaomobility.knsdk.common.objects.KNPOI
+import com.kakaomobility.knsdk.guidance.knguidance.KNGuideRouteChangeReason
+import com.kakaomobility.knsdk.guidance.knguidance.KNGuidance
+import com.kakaomobility.knsdk.guidance.knguidance.KNGuidance_CitsGuideDelegate
+import com.kakaomobility.knsdk.guidance.knguidance.KNGuidance_GuideStateDelegate
+import com.kakaomobility.knsdk.guidance.knguidance.KNGuidance_LocationGuideDelegate
+import com.kakaomobility.knsdk.guidance.knguidance.KNGuidance_RouteGuideDelegate
+import com.kakaomobility.knsdk.guidance.knguidance.KNGuidance_SafetyGuideDelegate
+import com.kakaomobility.knsdk.guidance.knguidance.KNGuidance_VoiceGuideDelegate
+import com.kakaomobility.knsdk.guidance.knguidance.citsguide.KNGuide_Cits
+import com.kakaomobility.knsdk.guidance.knguidance.common.KNLocation
+import com.kakaomobility.knsdk.guidance.knguidance.locationguide.KNGuide_Location
+import com.kakaomobility.knsdk.guidance.knguidance.routeguide.KNGuide_Route
+import com.kakaomobility.knsdk.guidance.knguidance.routeguide.objects.KNMultiRouteInfo
+import com.kakaomobility.knsdk.guidance.knguidance.safetyguide.KNGuide_Safety
+import com.kakaomobility.knsdk.guidance.knguidance.safetyguide.objects.KNSafety
+import com.kakaomobility.knsdk.guidance.knguidance.voiceguide.KNGuide_Voice
+import com.kakaomobility.knsdk.trip.kntrip.knroute.KNRoute
+import com.kakaomobility.knsdk.ui.view.KNNaviView
+import kotlin.math.roundToInt
+
+class KakaoNaviActivity :
+    AppCompatActivity(),
+    KNGuidance_GuideStateDelegate,
+    KNGuidance_LocationGuideDelegate,
+    KNGuidance_RouteGuideDelegate,
+    KNGuidance_SafetyGuideDelegate,
+    KNGuidance_VoiceGuideDelegate,
+    KNGuidance_CitsGuideDelegate {
+
+    private lateinit var naviView: KNNaviView
+    private lateinit var naviContainer: FrameLayout
+    private lateinit var statusPanel: View
+    private lateinit var statusText: TextView
+    private var guideStarted = false
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        SafeWayTheme.apply(this)
+        super.onCreate(savedInstanceState)
+        KNSDK.install(application, "${filesDir.absolutePath}/knsdk")
+        setContentView(R.layout.activity_kakao_navi)
+
+        naviContainer = findViewById(R.id.kakaoNaviContainer)
+        statusPanel = findViewById(R.id.kakaoNaviStatusPanel)
+        statusText = findViewById(R.id.kakaoNaviStatusText)
+        findViewById<TextView>(R.id.closeKakaoNaviButton).setOnClickListener { finish() }
+
+        if (!hasLocationPermission()) {
+            showStatus("위치 권한이 없어 카카오내비 길안내를 시작할 수 없습니다.")
+            return
+        }
+
+        val appKey = BuildConfig.KAKAO_NATIVE_APP_KEY.trim()
+        if (appKey.isEmpty()) {
+            showStatus("local.properties에 KAKAO_NATIVE_APP_KEY를 먼저 설정해야 합니다.")
+            return
+        }
+
+        val originLat = intent.getDoubleExtra(EXTRA_ORIGIN_LAT, Double.NaN)
+        val originLng = intent.getDoubleExtra(EXTRA_ORIGIN_LNG, Double.NaN)
+        val destinationLat = intent.getDoubleExtra(EXTRA_DESTINATION_LAT, Double.NaN)
+        val destinationLng = intent.getDoubleExtra(EXTRA_DESTINATION_LNG, Double.NaN)
+        val destinationName = intent.getStringExtra(EXTRA_DESTINATION_NAME)?.takeIf { it.isNotBlank() } ?: "도착지"
+        if (listOf(originLat, originLng, destinationLat, destinationLng).any { it.isNaN() }) {
+            showStatus("출발지 또는 도착지 좌표가 없어 길안내를 시작할 수 없습니다.")
+            return
+        }
+
+        showStatus("카카오내비 SDK를 초기화하는 중입니다.")
+        KNSDK.initializeWithAppKey(
+            appKey,
+            BuildConfig.VERSION_NAME,
+            userKey(),
+            "",
+            KNLanguageType.KNLanguageType_KOREAN
+        ) { error ->
+            runOnUiThread {
+                if (error != null) {
+                    showStatus("카카오내비 SDK 초기화 실패: ${formatError(error)}")
+                } else {
+                    ensureNaviView()
+                    requestRoute(originLat, originLng, destinationLat, destinationLng, destinationName)
+                }
+            }
+        }
+    }
+
+    private fun ensureNaviView(): KNNaviView {
+        if (!::naviView.isInitialized) {
+            naviView = KNNaviView(this)
+            naviContainer.addView(
+                naviView,
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
+            )
+        }
+        return naviView
+    }
+
+    private fun requestRoute(
+        originLat: Double,
+        originLng: Double,
+        destinationLat: Double,
+        destinationLng: Double,
+        destinationName: String
+    ) {
+        showStatus("카카오내비 경로를 요청하는 중입니다.")
+        val start = toPoi("현재 위치", originLat, originLng)
+        val goal = toPoi(destinationName, destinationLat, destinationLng)
+        KNSDK.makeTripWithStart(start, goal, null, null) { tripError, trip ->
+            runOnUiThread {
+                if (tripError != null || trip == null) {
+                    showStatus("카카오내비 경로 생성 실패: ${formatError(tripError)}")
+                    return@runOnUiThread
+                }
+
+                val routePriority = KNRoutePriority.KNRoutePriority_Recommand
+                val avoidOptions = KNRouteAvoidOption.KNRouteAvoidOption_None.value
+                trip.routeWithPriority(routePriority, avoidOptions) { routeError, _ ->
+                    runOnUiThread {
+                        if (routeError != null) {
+                            showStatus("카카오내비 경로 요청 실패: ${formatError(routeError)}")
+                            return@runOnUiThread
+                        }
+
+                        val guidance = KNSDK.sharedGuidance()
+                        if (guidance == null) {
+                            showStatus("카카오내비 안내 객체를 만들지 못했습니다.")
+                            return@runOnUiThread
+                        }
+                        guidance.guideStateDelegate = this
+                        guidance.locationGuideDelegate = this
+                        guidance.routeGuideDelegate = this
+                        guidance.safetyGuideDelegate = this
+                        guidance.voiceGuideDelegate = this
+                        guidance.citsGuideDelegate = this
+                        naviView.initWithGuidance(guidance, trip, routePriority, avoidOptions)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun toPoi(name: String, latitude: Double, longitude: Double): KNPOI {
+        val katec = KNSDK.convertWGS84ToKATEC(longitude, latitude)
+        return KakaoNaviPoiFactory.fromKatec(
+            name,
+            katec.x.roundToInt(),
+            katec.y.roundToInt()
+        )
+    }
+
+    private fun showStatus(message: String) {
+        statusText.text = message
+        statusPanel.visibility = View.VISIBLE
+    }
+
+    private fun hideStatus() {
+        statusPanel.visibility = View.GONE
+    }
+
+    private fun formatError(error: KNError?): String {
+        if (error == null) {
+            return "알 수 없는 오류"
+        }
+        val code = error.code.orEmpty()
+        val msg = error.msg.orEmpty()
+        return when {
+            code.isNotBlank() && msg.isNotBlank() -> "$code $msg"
+            code.isNotBlank() -> code
+            msg.isNotBlank() -> msg
+            else -> error.toString()
+        }
+    }
+
+    private fun hasLocationPermission(): Boolean {
+        return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun userKey(): String {
+        return Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
+            ?: "safeway-user"
+    }
+
+    override fun onResume() {
+        super.onResume()
+        KNSDK.handleDidBecomeActive()
+    }
+
+    override fun onPause() {
+        KNSDK.handleWillResignActive()
+        super.onPause()
+    }
+
+    override fun onDestroy() {
+        if (guideStarted) {
+            runCatching { KNSDK.sharedGuidance()?.stop() }
+            if (::naviView.isInitialized) {
+                runCatching { naviView.guideCancel() }
+            }
+        }
+        super.onDestroy()
+    }
+
+    override fun guidanceGuideStarted(guidance: KNGuidance) {
+        guideStarted = true
+        hideStatus()
+        naviView.guidanceGuideStarted(guidance)
+    }
+
+    override fun guidanceCheckingRouteChange(guidance: KNGuidance) {
+        naviView.guidanceCheckingRouteChange(guidance)
+    }
+
+    override fun guidanceRouteUnchanged(guidance: KNGuidance) {
+        naviView.guidanceRouteUnchanged(guidance)
+    }
+
+    override fun guidanceRouteUnchangedWithError(guidance: KNGuidance, error: KNError) {
+        naviView.guidanceRouteUnchangedWithError(guidance, error)
+    }
+
+    override fun guidanceOutOfRoute(guidance: KNGuidance) {
+        naviView.guidanceOutOfRoute(guidance)
+    }
+
+    override fun guidanceRouteChanged(
+        guidance: KNGuidance,
+        fromRoute: KNRoute,
+        fromLocation: KNLocation,
+        toRoute: KNRoute,
+        toLocation: KNLocation,
+        reason: KNGuideRouteChangeReason
+    ) {
+        naviView.guidanceRouteChanged(guidance)
+    }
+
+    override fun guidanceGuideEnded(guidance: KNGuidance) {
+        naviView.guidanceGuideEnded(guidance, true)
+        Toast.makeText(this, "카카오내비 길안내가 종료되었습니다.", Toast.LENGTH_SHORT).show()
+    }
+
+    override fun guidanceDidUpdateRoutes(
+        guidance: KNGuidance,
+        routes: List<KNRoute>,
+        multiRouteInfo: KNMultiRouteInfo?
+    ) {
+        naviView.guidanceDidUpdateRoutes(guidance, routes, multiRouteInfo)
+    }
+
+    override fun guidanceDidUpdateIndoorRoute(guidance: KNGuidance, route: KNRoute?) {
+        if (route != null) {
+            naviView.guidanceDidUpdateIndoorRoute(guidance, route)
+        }
+    }
+
+    override fun guidanceDidUpdateLocation(guidance: KNGuidance, locationGuide: KNGuide_Location) {
+        naviView.guidanceDidUpdateLocation(guidance, locationGuide)
+    }
+
+    override fun guidanceDidUpdateRouteGuide(guidance: KNGuidance, routeGuide: KNGuide_Route) {
+        naviView.guidanceDidUpdateRouteGuide(guidance, routeGuide)
+    }
+
+    override fun guidanceDidUpdateSafetyGuide(guidance: KNGuidance, safetyGuide: KNGuide_Safety?) {
+        naviView.guidanceDidUpdateSafetyGuide(guidance, safetyGuide)
+    }
+
+    override fun guidanceDidUpdateAroundSafeties(guidance: KNGuidance, safeties: List<KNSafety>?) {
+        naviView.guidanceDidUpdateAroundSafeties(guidance, safeties)
+    }
+
+    override fun shouldPlayVoiceGuide(
+        guidance: KNGuidance,
+        voiceGuide: KNGuide_Voice,
+        newData: MutableList<ByteArray>
+    ): Boolean {
+        return naviView.shouldPlayVoiceGuide(guidance, voiceGuide, newData)
+    }
+
+    override fun willPlayVoiceGuide(guidance: KNGuidance, voiceGuide: KNGuide_Voice) {
+        naviView.willPlayVoiceGuide(guidance, voiceGuide)
+    }
+
+    override fun didFinishPlayVoiceGuide(guidance: KNGuidance, voiceGuide: KNGuide_Voice) {
+        naviView.didFinishPlayVoiceGuide(guidance, voiceGuide)
+    }
+
+    override fun didUpdateCitsGuide(guidance: KNGuidance, citsGuide: KNGuide_Cits) {
+        naviView.didUpdateCitsGuide(guidance, citsGuide)
+    }
+
+    companion object {
+        private const val EXTRA_ORIGIN_LAT = "com.safeway.app.EXTRA_ORIGIN_LAT"
+        private const val EXTRA_ORIGIN_LNG = "com.safeway.app.EXTRA_ORIGIN_LNG"
+        private const val EXTRA_DESTINATION_LAT = "com.safeway.app.EXTRA_DESTINATION_LAT"
+        private const val EXTRA_DESTINATION_LNG = "com.safeway.app.EXTRA_DESTINATION_LNG"
+        private const val EXTRA_DESTINATION_NAME = "com.safeway.app.EXTRA_DESTINATION_NAME"
+
+        @JvmStatic
+        fun createIntent(
+            context: Context,
+            originLat: Double,
+            originLng: Double,
+            destinationLat: Double,
+            destinationLng: Double,
+            destinationName: String
+        ): Intent {
+            return Intent(context, KakaoNaviActivity::class.java)
+                .putExtra(EXTRA_ORIGIN_LAT, originLat)
+                .putExtra(EXTRA_ORIGIN_LNG, originLng)
+                .putExtra(EXTRA_DESTINATION_LAT, destinationLat)
+                .putExtra(EXTRA_DESTINATION_LNG, destinationLng)
+                .putExtra(EXTRA_DESTINATION_NAME, destinationName)
+        }
+    }
+}

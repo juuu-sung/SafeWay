@@ -1,0 +1,386 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2760" height="1120" viewBox="0 0 2760 1120">
+  <defs>
+    <style>
+      .font { font-family: Pretendard, "Noto Sans KR", Inter, Arial, sans-serif; }
+      .title { font-size: 34px; font-weight: 800; fill: #152137; }
+      .subtitle { font-size: 16px; font-weight: 500; fill: #5e6a7d; }
+      .screen-label { font-size: 18px; font-weight: 800; fill: #152137; }
+      .h1 { font-size: 28px; font-weight: 800; fill: #152137; }
+      .h2 { font-size: 20px; font-weight: 800; fill: #152137; }
+      .h3 { font-size: 16px; font-weight: 800; fill: #152137; }
+      .body { font-size: 14px; font-weight: 500; fill: #5e6a7d; }
+      .small { font-size: 12px; font-weight: 600; fill: #6d7788; }
+      .tiny { font-size: 10px; font-weight: 700; fill: #7a8494; }
+      .white { fill: #ffffff; }
+      .muted-white { fill: #d8e7ff; }
+      .navy { fill: #152137; }
+      .blue { fill: #1f6feb; }
+      .teal { fill: #0c9488; }
+      .danger { fill: #e5484d; }
+      .success { fill: #26a269; }
+      .warning { fill: #c77800; }
+      .line { stroke: #dce4ee; stroke-width: 1; }
+      .icon-line { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    </style>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#1b2a41" flood-opacity="0.12"/>
+    </filter>
+    <filter id="buttonShadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#1f6feb" flood-opacity="0.22"/>
+    </filter>
+    <linearGradient id="activeGradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1f6feb"/>
+      <stop offset="1" stop-color="#0c9488"/>
+    </linearGradient>
+    <linearGradient id="callGradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#192b47"/>
+      <stop offset="1" stop-color="#0c9488"/>
+    </linearGradient>
+    <symbol id="icon-shield" viewBox="0 0 24 24">
+      <path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6l7-3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M9 12l2 2 4-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="icon-phone" viewBox="0 0 24 24">
+      <path d="M7 4l3 4-2 2c1 3 3 5 6 6l2-2 4 3-1 3c-9 1-16-6-15-15l3-1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="icon-user" viewBox="0 0 24 24">
+      <circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"/>
+      <path d="M4 21c1-5 5-7 8-7s7 2 8 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="icon-mic" viewBox="0 0 24 24">
+      <rect x="9" y="3" width="6" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="2"/>
+      <path d="M5 11c0 4 3 7 7 7s7-3 7-7M12 18v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="icon-clock" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/>
+      <path d="M12 7v6l4 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="icon-list" viewBox="0 0 24 24">
+      <path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="icon-alert" viewBox="0 0 24 24">
+      <path d="M12 3l10 18H2L12 3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M12 9v5M12 17h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="icon-plus" viewBox="0 0 24 24">
+      <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="icon-home" viewBox="0 0 24 24">
+      <path d="M4 11l8-7 8 7v9h-5v-6H9v6H4v-9z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+    </symbol>
+  </defs>
+
+  <rect width="2760" height="1120" fill="#eef3f8"/>
+  <text x="64" y="60" class="font title">SafeWay Android App UI</text>
+  <text x="64" y="90" class="font subtitle">여성·학생 안심귀가 + AI 안심 동행 통화 / Android Studio XML 구현 기준</text>
+  <text x="2148" y="60" class="font small">Primary #1F6FEB · Teal #0C9488 · Danger #E5484D · Surface #FFFFFF</text>
+  <text x="2148" y="86" class="font small">Screen 390x844 · Card radius 8 · Button radius 8 · Font Pretendard/Noto Sans KR</text>
+
+  <!-- Screen 1 -->
+  <g class="font" transform="translate(64 160)">
+    <text x="0" y="-24" class="screen-label">01 메인 / 귀가 전</text>
+    <rect width="390" height="844" rx="32" fill="#152137" opacity="0.14"/>
+    <rect x="8" y="8" width="374" height="828" rx="30" fill="#f6f8fb" filter="url(#softShadow)"/>
+    <rect x="8" y="8" width="374" height="54" rx="30" fill="#f6f8fb"/>
+    <text x="32" y="43" class="small navy">9:41</text>
+    <rect x="306" y="30" width="28" height="12" rx="3" fill="none" stroke="#152137" stroke-width="1.4"/>
+    <rect x="336" y="34" width="3" height="5" rx="1" fill="#152137"/>
+    <rect x="310" y="33" width="20" height="6" rx="2" fill="#152137"/>
+
+    <text x="32" y="92" class="h1">SafeWay</text>
+    <text x="32" y="119" class="body">AI 안심귀가 도우미</text>
+    <rect x="286" y="80" width="64" height="30" rx="15" fill="#e6f7f4"/>
+    <text x="304" y="100" class="small teal">귀가 전</text>
+
+    <rect x="24" y="146" width="342" height="136" rx="8" fill="#ffffff" stroke="#dce4ee" filter="url(#softShadow)"/>
+    <circle cx="70" cy="194" r="22" fill="#e6f7f4"/>
+    <use href="#icon-shield" x="58" y="182" width="24" height="24" color="#0c9488"/>
+    <text x="108" y="188" class="small">현재 상태</text>
+    <text x="108" y="218" class="h2">귀가 전</text>
+    <text x="32" y="256" class="body">오늘도 안전하게 귀가하세요.</text>
+
+    <rect x="24" y="304" width="342" height="52" rx="8" fill="#1f6feb" filter="url(#buttonShadow)"/>
+    <use href="#icon-shield" x="90" y="318" width="22" height="22" color="#ffffff"/>
+    <text x="124" y="337" class="h3 white">안심귀가 시작하기</text>
+
+    <text x="24" y="392" class="h3">예상 귀가 시간</text>
+    <g transform="translate(24 408)">
+      <rect width="72" height="36" rx="18" fill="#eaf2ff"/>
+      <text x="23" y="23" class="small blue">10분</text>
+      <rect x="84" width="72" height="36" rx="18" fill="#1f6feb"/>
+      <text x="107" y="23" class="small white">20분</text>
+      <rect x="168" width="72" height="36" rx="18" fill="#eaf2ff"/>
+      <text x="191" y="23" class="small blue">30분</text>
+      <rect x="252" width="90" height="36" rx="18" fill="#ffffff" stroke="#dce4ee"/>
+      <text x="276" y="23" class="small">직접 입력</text>
+    </g>
+
+    <text x="24" y="488" class="h3">긴급 상황</text>
+    <rect x="24" y="508" width="163" height="58" rx="8" fill="#ffecee" stroke="#ffcbd0"/>
+    <use href="#icon-phone" x="46" y="525" width="22" height="22" color="#e5484d"/>
+    <text x="80" y="543" class="h3 danger">112 전화</text>
+    <rect x="203" y="508" width="163" height="58" rx="8" fill="#ffffff" stroke="#dce4ee"/>
+    <use href="#icon-user" x="222" y="525" width="22" height="22" color="#1f6feb"/>
+    <text x="256" y="543" class="h3 blue">보호자 전화</text>
+
+    <rect x="24" y="590" width="342" height="78" rx="8" fill="#192b47"/>
+    <use href="#icon-mic" x="45" y="617" width="24" height="24" color="#ffffff"/>
+    <text x="86" y="623" class="h3 white">AI 안심 동행 통화</text>
+    <text x="86" y="646" class="small muted-white">불안할 때 음성으로 바로 대화</text>
+
+    <text x="24" y="704" class="h3">메뉴</text>
+    <g transform="translate(24 724)">
+      <rect width="106" height="72" rx="8" fill="#ffffff" stroke="#dce4ee"/>
+      <use href="#icon-list" x="41" y="15" width="24" height="24" color="#1f6feb"/>
+      <text x="29" y="58" class="small">귀가 기록</text>
+      <rect x="118" width="106" height="72" rx="8" fill="#ffffff" stroke="#dce4ee"/>
+      <use href="#icon-alert" x="159" y="15" width="24" height="24" color="#c77800"/>
+      <text x="146" y="58" class="small">위험 메모</text>
+      <rect x="236" width="106" height="72" rx="8" fill="#ffffff" stroke="#dce4ee"/>
+      <use href="#icon-user" x="277" y="15" width="24" height="24" color="#0c9488"/>
+      <text x="264" y="58" class="small">보호자 설정</text>
+    </g>
+  </g>
+
+  <!-- Screen 2 -->
+  <g class="font" transform="translate(510 160)">
+    <text x="0" y="-24" class="screen-label">02 메인 / 귀가 중</text>
+    <rect width="390" height="844" rx="32" fill="#152137" opacity="0.14"/>
+    <rect x="8" y="8" width="374" height="828" rx="30" fill="#f6f8fb" filter="url(#softShadow)"/>
+    <text x="32" y="43" class="small navy">9:53</text>
+    <rect x="306" y="30" width="28" height="12" rx="3" fill="none" stroke="#152137" stroke-width="1.4"/>
+    <rect x="310" y="33" width="20" height="6" rx="2" fill="#152137"/>
+
+    <text x="32" y="92" class="h1">SafeWay</text>
+    <text x="32" y="119" class="body">귀가 진행 중</text>
+    <rect x="282" y="80" width="68" height="30" rx="15" fill="#eaf2ff"/>
+    <text x="301" y="100" class="small blue">귀가 중</text>
+
+    <rect x="24" y="146" width="342" height="190" rx="8" fill="url(#activeGradient)" filter="url(#softShadow)"/>
+    <text x="48" y="184" class="small muted-white">경과 시간</text>
+    <text x="48" y="232" style="font-size:44px;font-weight:800;fill:#ffffff;">00:12:45</text>
+    <text x="48" y="264" class="small muted-white">시작 21:40 · 예상 30분</text>
+    <rect x="48" y="292" width="246" height="8" rx="4" fill="#ffffff" opacity="0.28"/>
+    <rect x="48" y="292" width="104" height="8" rx="4" fill="#ffffff"/>
+    <text x="303" y="301" class="tiny muted-white">43%</text>
+    <circle cx="314" cy="196" r="28" fill="#ffffff" opacity="0.16"/>
+    <use href="#icon-clock" x="298" y="180" width="32" height="32" color="#ffffff"/>
+
+    <rect x="24" y="354" width="342" height="54" rx="8" fill="#fff7e6" stroke="#ffe0a3"/>
+    <use href="#icon-clock" x="44" y="370" width="22" height="22" color="#c77800"/>
+    <text x="78" y="376" class="small warning">예상 시간까지 17분 남음</text>
+    <text x="78" y="394" class="tiny">도착하면 바로 완료 버튼을 눌러주세요.</text>
+
+    <rect x="24" y="430" width="342" height="52" rx="8" fill="#26a269"/>
+    <text x="147" y="463" class="h3 white">귀가 완료하기</text>
+    <rect x="24" y="494" width="342" height="52" rx="8" fill="#192b47"/>
+    <use href="#icon-mic" x="88" y="508" width="22" height="22" color="#ffffff"/>
+    <text x="122" y="527" class="h3 white">AI 안심 동행 통화</text>
+
+    <rect x="24" y="566" width="163" height="58" rx="8" fill="#e5484d"/>
+    <use href="#icon-phone" x="49" y="583" width="22" height="22" color="#ffffff"/>
+    <text x="83" y="601" class="h3 white">112 전화</text>
+    <rect x="203" y="566" width="163" height="58" rx="8" fill="#ffffff" stroke="#dce4ee"/>
+    <use href="#icon-user" x="222" y="583" width="22" height="22" color="#1f6feb"/>
+    <text x="256" y="601" class="h3 blue">보호자 전화</text>
+
+    <text x="24" y="666" class="h3">근처 주의 메모</text>
+    <rect x="24" y="684" width="342" height="52" rx="8" fill="#ffffff" stroke="#dce4ee"/>
+    <text x="44" y="707" class="small navy">학교 후문 골목</text>
+    <text x="44" y="726" class="tiny">가로등이 어둡고 사람이 적음</text>
+    <rect x="24" y="748" width="342" height="52" rx="8" fill="#ffffff" stroke="#dce4ee"/>
+    <text x="44" y="771" class="small navy">버스정류장 뒤편</text>
+    <text x="44" y="790" class="tiny">밤 10시 이후 우회 추천</text>
+  </g>
+
+  <!-- Screen 3 -->
+  <g class="font" transform="translate(956 160)">
+    <text x="0" y="-24" class="screen-label">03 AI 안심 동행 통화</text>
+    <rect width="390" height="844" rx="32" fill="#152137" opacity="0.14"/>
+    <rect x="8" y="8" width="374" height="828" rx="30" fill="#f6f8fb" filter="url(#softShadow)"/>
+    <rect x="8" y="8" width="374" height="310" rx="30" fill="url(#callGradient)"/>
+    <text x="32" y="43" class="small white">9:56</text>
+    <rect x="306" y="30" width="28" height="12" rx="3" fill="none" stroke="#ffffff" stroke-width="1.4"/>
+    <rect x="310" y="33" width="20" height="6" rx="2" fill="#ffffff"/>
+
+    <text x="32" y="92" class="h2 white">AI 안심 동행 통화</text>
+    <text x="32" y="118" class="small muted-white">04:18 · 보호자 모드</text>
+    <circle cx="195" cy="178" r="54" fill="#ffffff" opacity="0.16"/>
+    <circle cx="195" cy="178" r="42" fill="#ffffff"/>
+    <use href="#icon-shield" x="171" y="154" width="48" height="48" color="#0c9488"/>
+    <text x="139" y="250" class="h3 white">AI 보호자 모드</text>
+    <text x="112" y="276" class="small muted-white">짧고 침착하게 안전 행동 안내</text>
+
+    <rect x="24" y="338" width="342" height="42" rx="21" fill="#ffffff" stroke="#dce4ee"/>
+    <rect x="28" y="342" width="108" height="34" rx="17" fill="#1f6feb"/>
+    <text x="57" y="364" class="small white">보호자</text>
+    <text x="168" y="364" class="small">친구</text>
+    <text x="270" y="364" class="small">안내</text>
+
+    <rect x="24" y="402" width="260" height="64" rx="8" fill="#ffffff" stroke="#dce4ee"/>
+    <text x="44" y="428" class="small blue">AI</text>
+    <text x="44" y="450" class="body">지금 어디쯤이야? 주변은 밝아?</text>
+    <rect x="106" y="480" width="260" height="58" rx="8" fill="#eaf2ff"/>
+    <text x="126" y="506" class="small blue">사용자</text>
+    <text x="126" y="527" class="body navy">학교 후문 지나가고 있어요.</text>
+    <rect x="24" y="552" width="294" height="74" rx="8" fill="#ffffff" stroke="#dce4ee"/>
+    <text x="44" y="578" class="small blue">AI</text>
+    <text x="44" y="600" class="body">밝은 큰길 쪽으로 이동하자.</text>
+    <text x="44" y="619" class="body">불안하면 보호자 전화도 바로 눌러.</text>
+
+    <rect x="24" y="646" width="342" height="58" rx="8" fill="#ffecee" stroke="#ffcbd0"/>
+    <use href="#icon-alert" x="44" y="664" width="22" height="22" color="#e5484d"/>
+    <text x="78" y="671" class="small danger">위험 표현 감지 시 긴급 버튼 강조</text>
+    <text x="78" y="690" class="tiny">“무서워요”, “따라와요” 같은 입력 처리</text>
+
+    <rect x="24" y="724" width="102" height="52" rx="8" fill="#e5484d"/>
+    <text x="49" y="757" class="small white">112</text>
+    <rect x="144" y="724" width="102" height="52" rx="8" fill="#ffffff" stroke="#dce4ee"/>
+    <text x="171" y="757" class="small blue">보호자</text>
+    <rect x="264" y="724" width="102" height="52" rx="8" fill="#152137"/>
+    <text x="291" y="757" class="small white">종료</text>
+    <circle cx="195" cy="812" r="30" fill="#0c9488"/>
+    <use href="#icon-mic" x="179" y="796" width="32" height="32" color="#ffffff"/>
+  </g>
+
+  <!-- Screen 4 -->
+  <g class="font" transform="translate(1402 160)">
+    <text x="0" y="-24" class="screen-label">04 보호자 설정</text>
+    <rect width="390" height="844" rx="32" fill="#152137" opacity="0.14"/>
+    <rect x="8" y="8" width="374" height="828" rx="30" fill="#f6f8fb" filter="url(#softShadow)"/>
+    <text x="32" y="43" class="small navy">9:41</text>
+    <rect x="306" y="30" width="28" height="12" rx="3" fill="none" stroke="#152137" stroke-width="1.4"/>
+    <rect x="310" y="33" width="20" height="6" rx="2" fill="#152137"/>
+
+    <text x="32" y="94" class="h1">보호자 설정</text>
+    <text x="32" y="122" class="body">긴급 상황에 연결할 연락처를 저장합니다.</text>
+
+    <rect x="24" y="150" width="342" height="106" rx="8" fill="#192b47" filter="url(#softShadow)"/>
+    <use href="#icon-user" x="44" y="184" width="32" height="32" color="#ffffff"/>
+    <text x="94" y="188" class="small muted-white">현재 등록된 보호자</text>
+    <text x="94" y="218" class="h2 white">엄마 · 보호자</text>
+    <text x="94" y="239" class="small muted-white">010-1234-5678</text>
+
+    <text x="24" y="294" class="h3">이름</text>
+    <rect x="24" y="310" width="342" height="52" rx="8" fill="#ffffff" stroke="#dce4ee"/>
+    <text x="44" y="343" class="body navy">엄마</text>
+    <text x="24" y="394" class="h3">전화번호</text>
+    <rect x="24" y="410" width="342" height="52" rx="8" fill="#ffffff" stroke="#dce4ee"/>
+    <text x="44" y="443" class="body navy">01012345678</text>
+    <text x="24" y="494" class="h3">관계</text>
+    <g transform="translate(24 512)">
+      <rect width="86" height="38" rx="19" fill="#1f6feb"/>
+      <text x="25" y="24" class="small white">부모님</text>
+      <rect x="98" width="76" height="38" rx="19" fill="#ffffff" stroke="#dce4ee"/>
+      <text x="124" y="24" class="small">친구</text>
+      <rect x="186" width="90" height="38" rx="19" fill="#ffffff" stroke="#dce4ee"/>
+      <text x="211" y="24" class="small">보호자</text>
+    </g>
+
+    <rect x="24" y="584" width="342" height="52" rx="8" fill="#1f6feb" filter="url(#buttonShadow)"/>
+    <text x="154" y="617" class="h3 white">저장하기</text>
+    <rect x="24" y="660" width="342" height="70" rx="8" fill="#e6f7f4" stroke="#c9eee8"/>
+    <use href="#icon-shield" x="44" y="682" width="24" height="24" color="#0c9488"/>
+    <text x="82" y="688" class="small teal">전화 연결은 ACTION_DIAL 방식</text>
+    <text x="82" y="708" class="tiny">권한 부담 없이 사용자가 직접 통화 버튼을 누릅니다.</text>
+  </g>
+
+  <!-- Screen 5 -->
+  <g class="font" transform="translate(1848 160)">
+    <text x="0" y="-24" class="screen-label">05 귀가 기록</text>
+    <rect width="390" height="844" rx="32" fill="#152137" opacity="0.14"/>
+    <rect x="8" y="8" width="374" height="828" rx="30" fill="#f6f8fb" filter="url(#softShadow)"/>
+    <text x="32" y="43" class="small navy">9:41</text>
+    <rect x="306" y="30" width="28" height="12" rx="3" fill="none" stroke="#152137" stroke-width="1.4"/>
+    <rect x="310" y="33" width="20" height="6" rx="2" fill="#152137"/>
+
+    <text x="32" y="94" class="h1">귀가 기록</text>
+    <text x="32" y="122" class="body">완료 시간과 AI 통화 요약을 확인합니다.</text>
+
+    <g transform="translate(24 150)">
+      <rect width="106" height="78" rx="8" fill="#ffffff" stroke="#dce4ee"/>
+      <text x="20" y="30" class="tiny">이번 주</text>
+      <text x="20" y="58" class="h2">4회</text>
+      <rect x="118" width="106" height="78" rx="8" fill="#ffffff" stroke="#dce4ee"/>
+      <text x="138" y="30" class="tiny">평균 소요</text>
+      <text x="138" y="58" class="h2">31분</text>
+      <rect x="236" width="106" height="78" rx="8" fill="#ffffff" stroke="#dce4ee"/>
+      <text x="256" y="30" class="tiny">AI 통화</text>
+      <text x="256" y="58" class="h2">2회</text>
+    </g>
+
+    <rect x="24" y="256" width="342" height="42" rx="21" fill="#ffffff" stroke="#dce4ee"/>
+    <rect x="28" y="260" width="86" height="34" rx="17" fill="#1f6feb"/>
+    <text x="60" y="282" class="small white">전체</text>
+    <text x="159" y="282" class="small">완료</text>
+    <text x="263" y="282" class="small">AI 사용</text>
+
+    <rect x="24" y="326" width="342" height="136" rx="8" fill="#ffffff" stroke="#dce4ee" filter="url(#softShadow)"/>
+    <text x="44" y="354" class="h3">2026-05-18</text>
+    <rect x="286" y="338" width="58" height="26" rx="13" fill="#e6f7f4"/>
+    <text x="303" y="356" class="tiny teal">완료</text>
+    <text x="44" y="384" class="body">21:30 → 22:05 · 35분</text>
+    <line x1="44" y1="402" x2="344" y2="402" class="line"/>
+    <text x="44" y="428" class="small blue">AI 요약</text>
+    <text x="102" y="428" class="small">학교 후문에서 불안을 느껴 큰길로 이동함</text>
+
+    <rect x="24" y="480" width="342" height="112" rx="8" fill="#ffffff" stroke="#dce4ee"/>
+    <text x="44" y="508" class="h3">2026-05-17</text>
+    <rect x="286" y="492" width="58" height="26" rx="13" fill="#e6f7f4"/>
+    <text x="303" y="510" class="tiny teal">완료</text>
+    <text x="44" y="538" class="body">20:10 → 20:40 · 30분</text>
+    <text x="44" y="566" class="small">AI 통화 사용 안 함</text>
+
+    <rect x="24" y="610" width="342" height="112" rx="8" fill="#ffffff" stroke="#dce4ee"/>
+    <text x="44" y="638" class="h3">2026-05-16</text>
+    <rect x="286" y="622" width="58" height="26" rx="13" fill="#e6f7f4"/>
+    <text x="303" y="640" class="tiny teal">완료</text>
+    <text x="44" y="668" class="body">22:00 → 22:34 · 34분</text>
+    <text x="44" y="696" class="small blue">AI 요약</text>
+    <text x="102" y="696" class="small">버스정류장 대기 중 차분한 안내 모드 사용</text>
+  </g>
+
+  <!-- Screen 6 -->
+  <g class="font" transform="translate(2294 160)">
+    <text x="0" y="-24" class="screen-label">06 위험 지역 메모</text>
+    <rect width="390" height="844" rx="32" fill="#152137" opacity="0.14"/>
+    <rect x="8" y="8" width="374" height="828" rx="30" fill="#f6f8fb" filter="url(#softShadow)"/>
+    <text x="32" y="43" class="small navy">9:41</text>
+    <rect x="306" y="30" width="28" height="12" rx="3" fill="none" stroke="#152137" stroke-width="1.4"/>
+    <rect x="310" y="33" width="20" height="6" rx="2" fill="#152137"/>
+
+    <text x="32" y="94" class="h1">위험 지역 메모</text>
+    <text x="32" y="122" class="body">불안했던 장소를 기록하고 다음 귀가에 참고합니다.</text>
+    <rect x="258" y="82" width="92" height="34" rx="17" fill="#1f6feb"/>
+    <use href="#icon-plus" x="272" y="90" width="18" height="18" color="#ffffff"/>
+    <text x="298" y="104" class="small white">추가</text>
+
+    <rect x="24" y="150" width="342" height="94" rx="8" fill="#ffffff" stroke="#dce4ee" filter="url(#softShadow)"/>
+    <rect x="44" y="174" width="36" height="36" rx="18" fill="#fff7e6"/>
+    <use href="#icon-alert" x="52" y="182" width="20" height="20" color="#c77800"/>
+    <text x="96" y="180" class="h3">학교 후문 골목</text>
+    <text x="96" y="204" class="body">가로등이 어둡고 사람이 적음</text>
+    <text x="96" y="226" class="tiny">2026-05-18 · 밤 10시 이후 우회 추천</text>
+
+    <rect x="24" y="260" width="342" height="94" rx="8" fill="#ffffff" stroke="#dce4ee"/>
+    <rect x="44" y="284" width="36" height="36" rx="18" fill="#ffecee"/>
+    <use href="#icon-alert" x="52" y="292" width="20" height="20" color="#e5484d"/>
+    <text x="96" y="290" class="h3">버스정류장 뒤편</text>
+    <text x="96" y="314" class="body">밤에 사람이 거의 없음</text>
+    <text x="96" y="336" class="tiny">2026-05-17 · 큰길 정류장 이용 추천</text>
+
+    <text x="24" y="398" class="h3">빠른 등록</text>
+    <rect x="24" y="416" width="342" height="300" rx="8" fill="#ffffff" stroke="#dce4ee" filter="url(#softShadow)"/>
+    <text x="44" y="448" class="small">장소명</text>
+    <rect x="44" y="462" width="302" height="46" rx="8" fill="#f6f8fb" stroke="#dce4ee"/>
+    <text x="62" y="491" class="body navy">학교 후문 골목</text>
+    <text x="44" y="538" class="small">위험 이유</text>
+    <rect x="44" y="552" width="302" height="46" rx="8" fill="#f6f8fb" stroke="#dce4ee"/>
+    <text x="62" y="581" class="body navy">가로등이 어둡고 사람이 적음</text>
+    <text x="44" y="628" class="small">상세 메모</text>
+    <rect x="44" y="642" width="302" height="48" rx="8" fill="#f6f8fb" stroke="#dce4ee"/>
+    <text x="62" y="672" class="body navy">밤 10시 이후에는 큰길 이용</text>
+    <rect x="44" y="724" width="302" height="52" rx="8" fill="#0c9488"/>
+    <text x="170" y="757" class="h3 white">저장하기</text>
+  </g>
+</svg>

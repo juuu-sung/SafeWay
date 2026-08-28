@@ -1,0 +1,23 @@
+<resources>
+    <color name="safeway_bg">#FFFBFC</color>
+    <color name="safeway_surface">#FFFFFF</color>
+    <color name="safeway_ink">#2C2C36</color>
+    <color name="safeway_muted">#89828F</color>
+    <color name="safeway_border">#F1E7EC</color>
+    <color name="safeway_primary">#F36F91</color>
+    <color name="safeway_primary_dark">#2A3142</color>
+    <color name="safeway_primary_soft">#FFF1F5</color>
+    <color name="safeway_primary_track">#FFD3DE</color>
+    <color name="safeway_coral">#F47C7C</color>
+    <color name="safeway_voice">#5547A8</color>
+    <color name="safeway_teal">#2FAE9B</color>
+    <color name="safeway_teal_soft">#EAF9F6</color>
+    <color name="safeway_danger">#E5484D</color>
+    <color name="safeway_danger_soft">#FFF0F1</color>
+    <color name="safeway_success">#2FAE9B</color>
+    <color name="safeway_warning">#B87500</color>
+    <color name="safeway_warning_soft">#FFF9EA</color>
+    <color name="safeway_kakao_yellow">#FEE500</color>
+    <color name="safeway_kakao_ink">#191919</color>
+    <color name="white">#FFFFFF</color>
+</resources>

@@ -281,9 +281,154 @@
                     android:textColor="@color/safeway_primary"
                     android:textSize="12sp"
                     android:textStyle="bold" />
+
+                <LinearLayout
+                    android:id="@+id/guardianActions"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="12dp"
+                    android:orientation="horizontal"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:id="@+id/sendTestPushButton"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_teal"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:text="테스트 알림"
+                        android:textColor="@color/white"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/unlinkGuardianButton"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="10dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_danger_soft"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:text="연동 해제"
+                        android:textColor="@color/safeway_danger"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
             </LinearLayout>
 
             <LinearLayout
+                android:id="@+id/shareScopeCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:background="@drawable/bg_card"
+                android:elevation="2dp"
+                android:orientation="vertical"
+                android:padding="18dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="보호자와 공유하는 정보"
+                    android:textColor="@color/safeway_ink"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="귀가 시작·완료, 경로 이탈, 위험 감지 알림은 항상 전송됩니다. 아래에서 알림에 포함할 상세 정보를 선택하세요."
+                    android:textColor="@color/safeway_muted"
+                    android:textSize="12sp" />
+
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/shareLiveLocationSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_marginTop="12dp"
+                    android:checked="true"
+                    android:text="실시간 위치"
+                    android:textColor="@color/safeway_ink"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="안심귀가가 진행되는 동안에만 현재 위치를 공유합니다."
+                    android:textColor="@color/safeway_muted"
+                    android:textSize="11sp" />
+
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/shareRouteDetailsSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_marginTop="6dp"
+                    android:checked="true"
+                    android:text="목적지와 이동 경로"
+                    android:textColor="@color/safeway_ink"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="목적지, 예상 시간, 계획한 이동 경로를 알림에 포함합니다."
+                    android:textColor="@color/safeway_muted"
+                    android:textSize="11sp" />
+
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/shareAiExcerptSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_marginTop="6dp"
+                    android:text="AI 위험 감지 시 발화 일부"
+                    android:textColor="@color/safeway_ink"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="끄면 발화 내용 없이 위험 신호만 알립니다. 기본값은 꺼짐입니다."
+                    android:textColor="@color/safeway_muted"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:id="@+id/saveShareScopeButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="16dp"
+                    android:background="@drawable/bg_primary"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:text="공유 설정 저장"
+                    android:textColor="@color/white"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/shareScopeSummaryText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_primary_soft"
+                    android:padding="14dp"
+                    android:text="현재 공유 범위를 불러오는 중입니다."
+                    android:textColor="@color/safeway_primary"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/pairingCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
@@ -565,7 +710,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="고급 설정"
+                    android:text="앱 설정"
                     android:textColor="@color/safeway_teal"
                     android:textSize="16sp"
                     android:textStyle="bold" />
@@ -574,87 +719,15 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
-                    android:text="연동 코드가 안 되거나 테스트가 필요할 때만 확인하세요."
+                    android:text="화면 테마를 선택합니다."
                     android:textColor="@color/safeway_muted"
                     android:textSize="11sp"
                     android:textStyle="bold" />
 
-                <EditText
-                    android:id="@+id/guardianPushTokenInput"
+                <TextView
                     android:layout_width="match_parent"
-                    android:layout_height="76dp"
+                    android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    android:background="@drawable/bg_input"
-                    android:gravity="top"
-                    android:hint="보호자 앱 푸시 토큰 직접 입력"
-                    android:inputType="textMultiLine|textNoSuggestions"
-                    android:minLines="2"
-                    android:padding="14dp"
-                    android:textColor="@color/safeway_ink"
-                    android:textColorHint="@color/safeway_muted"
-                    android:textSize="12sp" />
-
-                <TextView
-                    android:id="@+id/sendTestPushButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="44dp"
-                    android:layout_marginTop="10dp"
-                    android:background="@drawable/bg_teal"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center"
-                    android:text="테스트 알림 보내기"
-                    android:textColor="@color/white"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="18dp"
-                    android:text="이 기기의 보호자 앱 토큰"
-                    android:textColor="@color/safeway_teal"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/devicePushTokenStatusText"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:text="토큰을 준비하는 중입니다."
-                    android:textColor="@color/safeway_muted"
-                    android:textSize="11sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/devicePushTokenText"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="Firebase 설정 후 표시됩니다."
-                    android:textColor="@color/safeway_ink"
-                    android:textIsSelectable="true"
-                    android:textSize="11sp" />
-
-                <TextView
-                    android:id="@+id/copyDevicePushTokenButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="42dp"
-                    android:layout_marginTop="12dp"
-                    android:background="@drawable/bg_outline"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center"
-                    android:text="이 기기 토큰 복사"
-                    android:textColor="@color/safeway_primary"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="18dp"
                     android:text="테마"
                     android:textColor="@color/safeway_teal"
                     android:textSize="13sp"

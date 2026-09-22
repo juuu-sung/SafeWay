@@ -92,34 +92,27 @@ public class SafeWayMessagingService extends FirebaseMessagingService {
     ) {
         SharedPreferences prefs = SafeWayPrefs.get(this);
         String statusValue = status == null ? "" : status.trim();
-        boolean resetLocationState = "linked".equals(statusValue) || "notice".equals(statusValue);
+        boolean unlinked = "unlinked".equals(statusValue);
         prefs.edit()
                 .putString(SafeWayPrefs.LATEST_GUARDIAN_ALERT_TITLE, title)
                 .putString(SafeWayPrefs.LATEST_GUARDIAN_ALERT_BODY, body)
-                .putString(SafeWayPrefs.LATEST_GUARDIAN_ALERT_MAPS_LINK, resetLocationState ? "" : keepExistingIfEmpty(prefs, SafeWayPrefs.LATEST_GUARDIAN_ALERT_MAPS_LINK, mapsLink))
-                .putString(SafeWayPrefs.LATEST_GUARDIAN_ALERT_ROUTE_LINK, resetLocationState ? "" : keepExistingIfEmpty(prefs, SafeWayPrefs.LATEST_GUARDIAN_ALERT_ROUTE_LINK, routeLink))
-                .putString(SafeWayPrefs.LATEST_GUARDIAN_ALERT_ROUTE_POINTS, resetLocationState ? "" : keepExistingIfEmpty(prefs, SafeWayPrefs.LATEST_GUARDIAN_ALERT_ROUTE_POINTS, routePoints))
-                .putString(SafeWayPrefs.LATEST_GUARDIAN_ALERT_DESTINATION, resetLocationState ? "" : keepExistingIfEmpty(prefs, SafeWayPrefs.LATEST_GUARDIAN_ALERT_DESTINATION, destination))
+                .putString(SafeWayPrefs.LATEST_GUARDIAN_ALERT_MAPS_LINK, emptyIfNull(mapsLink))
+                .putString(SafeWayPrefs.LATEST_GUARDIAN_ALERT_ROUTE_LINK, emptyIfNull(routeLink))
+                .putString(SafeWayPrefs.LATEST_GUARDIAN_ALERT_ROUTE_POINTS, emptyIfNull(routePoints))
+                .putString(SafeWayPrefs.LATEST_GUARDIAN_ALERT_DESTINATION, emptyIfNull(destination))
                 .putString(SafeWayPrefs.LATEST_GUARDIAN_ALERT_STATUS, statusValue)
-                .putString(SafeWayPrefs.LATEST_GUARDIAN_ALERT_LATITUDE, resetLocationState ? "" : keepExistingIfEmpty(prefs, SafeWayPrefs.LATEST_GUARDIAN_ALERT_LATITUDE, latitude))
-                .putString(SafeWayPrefs.LATEST_GUARDIAN_ALERT_LONGITUDE, resetLocationState ? "" : keepExistingIfEmpty(prefs, SafeWayPrefs.LATEST_GUARDIAN_ALERT_LONGITUDE, longitude))
-                .putInt(SafeWayPrefs.LATEST_GUARDIAN_ALERT_EXPECTED_MINUTES, resetLocationState ? 0 : keepExistingIntIfEmpty(prefs, expectedMinutes))
+                .putString(SafeWayPrefs.LATEST_GUARDIAN_ALERT_LATITUDE, emptyIfNull(latitude))
+                .putString(SafeWayPrefs.LATEST_GUARDIAN_ALERT_LONGITUDE, emptyIfNull(longitude))
+                .putInt(SafeWayPrefs.LATEST_GUARDIAN_ALERT_EXPECTED_MINUTES, parsePositiveInt(expectedMinutes))
                 .putLong(SafeWayPrefs.LATEST_GUARDIAN_ALERT_UPDATED_AT, System.currentTimeMillis())
                 .apply();
+        if (unlinked) {
+            prefs.edit().putString(SafeWayPrefs.GUARDIAN_ALERT_HISTORY_JSON, "[]").apply();
+        }
     }
 
-    private String keepExistingIfEmpty(SharedPreferences prefs, String key, String value) {
-        if (value == null || value.trim().isEmpty()) {
-            return prefs.getString(key, "");
-        }
-        return value;
-    }
-
-    private int keepExistingIntIfEmpty(SharedPreferences prefs, String value) {
-        if (value == null || value.trim().isEmpty()) {
-            return prefs.getInt(SafeWayPrefs.LATEST_GUARDIAN_ALERT_EXPECTED_MINUTES, 0);
-        }
-        return parsePositiveInt(value);
+    private String emptyIfNull(String value) {
+        return value == null ? "" : value;
     }
 
     private int parsePositiveInt(String value) {

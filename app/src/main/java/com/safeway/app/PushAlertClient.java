@@ -175,6 +175,46 @@ final class PushAlertClient {
         });
     }
 
+    static void unlinkGuardian(Context context, Callback callback) {
+        SharedPreferences prefs = SafeWayPrefs.get(context);
+        String serverUrl = normalizeBaseUrl(prefs.getString(SafeWayPrefs.PUSH_SERVER_URL, ""));
+        String guardianToken = prefs.getString(SafeWayPrefs.GUARDIAN_PUSH_TOKEN, "");
+        String token = guardianToken == null ? "" : guardianToken.trim();
+        if (serverUrl.isEmpty()) {
+            post(callback, false, "푸시 서버 주소가 없어 연동을 해제할 수 없습니다.");
+            return;
+        }
+        if (token.isEmpty()) {
+            post(callback, false, "연동된 보호자 정보가 없습니다.");
+            return;
+        }
+
+        EXECUTOR.execute(() -> {
+            HttpURLConnection connection = null;
+            try {
+                JSONObject payload = new JSONObject();
+                payload.put("guardianToken", token);
+                connection = openJsonPost(serverUrl + "/guardians/unlink", payload);
+                int status = connection.getResponseCode();
+                String responseBody = readResponse(connection);
+                JSONObject response = parseJsonObject(responseBody);
+                if (status >= 200 && status < 300 && response.optBoolean("ok")) {
+                    post(callback, true, "보호자 연동을 해제했습니다.");
+                } else {
+                    post(callback, false, response.optString("error", "연동 해제 실패: " + status));
+                }
+            } catch (JSONException e) {
+                post(callback, false, "연동 해제 실패: 서버를 최신 코드로 재시작해주세요.");
+            } catch (Exception e) {
+                post(callback, false, buildConnectionFailureMessage("연동 해제 실패", serverUrl, e));
+            } finally {
+                if (connection != null) {
+                    connection.disconnect();
+                }
+            }
+        });
+    }
+
     static void fetchLatestGuardianStatus(Context context, Callback callback) {
         SharedPreferences prefs = SafeWayPrefs.get(context);
         String serverUrl = normalizeBaseUrl(prefs.getString(SafeWayPrefs.PUSH_SERVER_URL, ""));
@@ -235,6 +275,8 @@ final class PushAlertClient {
         String routeDestination = getRouteDestination(prefs, destination);
         String routePoints = compactRoutePoints(prefs.getString(SafeWayPrefs.ROUTE_LAST_POINTS, ""));
         int expectedMinutes = prefs.getInt(SafeWayPrefs.ROUTE_EXPECTED_MINUTES, 0);
+        boolean shareLiveLocation = prefs.getBoolean(SafeWayPrefs.GUARDIAN_SHARE_LIVE_LOCATION, true);
+        boolean shareRouteDetails = prefs.getBoolean(SafeWayPrefs.GUARDIAN_SHARE_ROUTE_DETAILS, true);
 
         if (serverUrl.isEmpty() || guardianToken == null || guardianToken.trim().isEmpty()) {
             post(callback, false, "푸시 서버 주소 또는 보호자 토큰이 없습니다.");
@@ -249,20 +291,20 @@ final class PushAlertClient {
                 payload.put("guardianName", guardianName);
                 payload.put("title", "SafeWay 안심귀가 알림");
                 payload.put("status", "active");
-                if (expectedMinutes > 0) {
+                if (shareRouteDetails && expectedMinutes > 0) {
                     payload.put("expectedMinutes", String.valueOf(expectedMinutes));
                 }
-                boolean hasDestination = destination != null && !destination.trim().isEmpty();
+                boolean hasDestination = shareRouteDetails && destination != null && !destination.trim().isEmpty();
                 if (hasDestination) {
                     payload.put("destination", destination.trim());
                 }
-                if (location != null) {
+                if (shareRouteDetails && !routePoints.isEmpty()) {
+                    payload.put("routePoints", routePoints);
+                }
+                if (shareLiveLocation && location != null) {
                     String mapsLink = buildMapsLink(location);
                     if (hasDestination) {
                         payload.put("routeLink", buildDirectionsLink(location, routeDestination));
-                    }
-                    if (!routePoints.isEmpty()) {
-                        payload.put("routePoints", routePoints);
                     }
                     payload.put("body", hasDestination
                             ? "안심귀가가 시작되었습니다. 알림을 눌러 귀가 경로를 확인하세요."
@@ -270,6 +312,8 @@ final class PushAlertClient {
                     payload.put("mapsLink", mapsLink);
                     payload.put("latitude", String.format(Locale.US, "%.7f", location.getLatitude()));
                     payload.put("longitude", String.format(Locale.US, "%.7f", location.getLongitude()));
+                } else if (hasDestination) {
+                    payload.put("body", "안심귀가가 시작되었습니다. 목적지와 계획 경로를 확인하세요.");
                 } else {
                     payload.put("body", "안심귀가가 시작되었습니다. 위치를 확인하는 중입니다.");
                 }
@@ -326,6 +370,7 @@ final class PushAlertClient {
         String destination = prefs.getString(SafeWayPrefs.ROUTE_DESTINATION, "");
         String routeLink = prefs.getString(SafeWayPrefs.ROUTE_LAST_LINK, "");
         String routePoints = compactRoutePoints(prefs.getString(SafeWayPrefs.ROUTE_LAST_POINTS, ""));
+        boolean shareRouteDetails = prefs.getBoolean(SafeWayPrefs.GUARDIAN_SHARE_ROUTE_DETAILS, true);
 
         if (serverUrl.isEmpty() || guardianToken == null || guardianToken.trim().isEmpty()) {
             post(callback, false, "푸시 서버 주소 또는 보호자 토큰이 없습니다.");
@@ -341,15 +386,17 @@ final class PushAlertClient {
                 payload.put("title", "SafeWay 귀가 완료");
                 payload.put("body", "안심귀가가 완료되었습니다. 무사히 도착했는지 확인하세요.");
                 payload.put("durationMinutes", String.valueOf(Math.max(1, durationMinutes)));
-                payload.put("expectedMinutes", String.valueOf(Math.max(0, expectedMinutes)));
-                if (destination != null && !destination.trim().isEmpty()) {
-                    payload.put("destination", destination.trim());
-                }
-                if (routeLink != null && !routeLink.trim().isEmpty()) {
-                    payload.put("routeLink", routeLink.trim());
-                }
-                if (!routePoints.isEmpty()) {
-                    payload.put("routePoints", routePoints);
+                if (shareRouteDetails) {
+                    payload.put("expectedMinutes", String.valueOf(Math.max(0, expectedMinutes)));
+                    if (destination != null && !destination.trim().isEmpty()) {
+                        payload.put("destination", destination.trim());
+                    }
+                    if (routeLink != null && !routeLink.trim().isEmpty()) {
+                        payload.put("routeLink", routeLink.trim());
+                    }
+                    if (!routePoints.isEmpty()) {
+                        payload.put("routePoints", routePoints);
+                    }
                 }
 
                 URL url = new URL(serverUrl + "/alerts/return-completed");
@@ -389,16 +436,13 @@ final class PushAlertClient {
         String routeDestination = getRouteDestination(prefs, destination);
         String routePoints = compactRoutePoints(prefs.getString(SafeWayPrefs.ROUTE_LAST_POINTS, ""));
         int expectedMinutes = prefs.getInt(SafeWayPrefs.ROUTE_EXPECTED_MINUTES, 0);
+        boolean shareLiveLocation = prefs.getBoolean(SafeWayPrefs.GUARDIAN_SHARE_LIVE_LOCATION, true);
+        boolean shareRouteDetails = prefs.getBoolean(SafeWayPrefs.GUARDIAN_SHARE_ROUTE_DETAILS, true);
 
         if (serverUrl.isEmpty() || guardianToken == null || guardianToken.trim().isEmpty()) {
             post(callback, false, "푸시 서버 주소 또는 보호자 토큰이 없습니다.");
             return;
         }
-        if (location == null) {
-            post(callback, false, "현재 위치가 없어 경로 이탈 알림을 보낼 수 없습니다.");
-            return;
-        }
-
         EXECUTOR.execute(() -> {
             HttpURLConnection connection = null;
             try {
@@ -406,20 +450,26 @@ final class PushAlertClient {
                 payload.put("guardianToken", guardianToken.trim());
                 payload.put("status", "deviated");
                 payload.put("title", "SafeWay 경로 이탈 감지");
-                payload.put("body", "자녀가 설정한 귀가 경로에서 약 " + Math.max(1, offRouteMeters) + "m 벗어났습니다. 현재 위치를 확인하세요.");
-                payload.put("mapsLink", buildMapsLink(location));
-                payload.put("routeLink", buildDirectionsLink(location, routeDestination));
-                if (!routePoints.isEmpty()) {
-                    payload.put("routePoints", routePoints);
+                boolean includeCurrentLocation = shareLiveLocation && location != null;
+                payload.put("body", "자녀가 설정한 귀가 경로에서 약 " + Math.max(1, offRouteMeters) + "m 벗어났습니다. "
+                        + (includeCurrentLocation ? "현재 위치를 확인하세요." : "바로 연락해 상태를 확인하세요."));
+                if (includeCurrentLocation) {
+                    payload.put("mapsLink", buildMapsLink(location));
+                    payload.put("latitude", String.format(Locale.US, "%.7f", location.getLatitude()));
+                    payload.put("longitude", String.format(Locale.US, "%.7f", location.getLongitude()));
                 }
-                payload.put("latitude", String.format(Locale.US, "%.7f", location.getLatitude()));
-                payload.put("longitude", String.format(Locale.US, "%.7f", location.getLongitude()));
                 payload.put("offRouteMeters", String.valueOf(Math.max(1, offRouteMeters)));
-                if (destination != null && !destination.trim().isEmpty()) {
-                    payload.put("destination", destination.trim());
-                }
-                if (expectedMinutes > 0) {
-                    payload.put("expectedMinutes", String.valueOf(expectedMinutes));
+                if (shareRouteDetails) {
+                    if (destination != null && !destination.trim().isEmpty()) {
+                        payload.put("destination", destination.trim());
+                        payload.put("routeLink", buildDirectionsLink(includeCurrentLocation ? location : null, routeDestination));
+                    }
+                    if (!routePoints.isEmpty()) {
+                        payload.put("routePoints", routePoints);
+                    }
+                    if (expectedMinutes > 0) {
+                        payload.put("expectedMinutes", String.valueOf(expectedMinutes));
+                    }
                 }
 
                 connection = openJsonPost(serverUrl + "/alerts/route-deviation", payload);
@@ -440,12 +490,14 @@ final class PushAlertClient {
     }
 
     static void sendReturnLocationUpdate(Context context, Location location, Callback callback) {
-        if (location == null || !shouldSendLiveLocationUpdate(location)) {
+        if (location == null) {
             return;
         }
 
         SharedPreferences prefs = SafeWayPrefs.get(context);
-        if (!prefs.getBoolean(SafeWayPrefs.RETURNING, false)) {
+        if (!prefs.getBoolean(SafeWayPrefs.RETURNING, false)
+                || !prefs.getBoolean(SafeWayPrefs.GUARDIAN_SHARE_LIVE_LOCATION, true)
+                || !shouldSendLiveLocationUpdate(location)) {
             return;
         }
 
@@ -455,6 +507,7 @@ final class PushAlertClient {
         String routeDestination = getRouteDestination(prefs, destination);
         String routePoints = compactRoutePoints(prefs.getString(SafeWayPrefs.ROUTE_LAST_POINTS, ""));
         int expectedMinutes = prefs.getInt(SafeWayPrefs.ROUTE_EXPECTED_MINUTES, 0);
+        boolean shareRouteDetails = prefs.getBoolean(SafeWayPrefs.GUARDIAN_SHARE_ROUTE_DETAILS, true);
 
         if (serverUrl.isEmpty() || guardianToken == null || guardianToken.trim().isEmpty()) {
             post(callback, false, "푸시 서버 주소 또는 보호자 토큰이 없습니다.");
@@ -470,15 +523,17 @@ final class PushAlertClient {
                 payload.put("title", "SafeWay 실시간 위치");
                 payload.put("body", "안심귀가 중입니다. 위치가 실시간으로 업데이트되고 있습니다.");
                 payload.put("mapsLink", buildMapsLink(location));
-                if (destination != null && !destination.trim().isEmpty()) {
-                    payload.put("destination", destination.trim());
-                    payload.put("routeLink", buildDirectionsLink(location, routeDestination));
-                }
-                if (!routePoints.isEmpty()) {
-                    payload.put("routePoints", routePoints);
-                }
-                if (expectedMinutes > 0) {
-                    payload.put("expectedMinutes", String.valueOf(expectedMinutes));
+                if (shareRouteDetails) {
+                    if (destination != null && !destination.trim().isEmpty()) {
+                        payload.put("destination", destination.trim());
+                        payload.put("routeLink", buildDirectionsLink(location, routeDestination));
+                    }
+                    if (!routePoints.isEmpty()) {
+                        payload.put("routePoints", routePoints);
+                    }
+                    if (expectedMinutes > 0) {
+                        payload.put("expectedMinutes", String.valueOf(expectedMinutes));
+                    }
                 }
                 payload.put("latitude", String.format(Locale.US, "%.7f", location.getLatitude()));
                 payload.put("longitude", String.format(Locale.US, "%.7f", location.getLongitude()));
@@ -566,6 +621,10 @@ final class PushAlertClient {
         String routeLink = prefs.getString(SafeWayPrefs.ROUTE_LAST_LINK, "");
         String routePoints = compactRoutePoints(prefs.getString(SafeWayPrefs.ROUTE_LAST_POINTS, ""));
         int expectedMinutes = prefs.getInt(SafeWayPrefs.ROUTE_EXPECTED_MINUTES, 0);
+        boolean shareLiveLocation = prefs.getBoolean(SafeWayPrefs.GUARDIAN_SHARE_LIVE_LOCATION, true)
+                && prefs.getBoolean(SafeWayPrefs.RETURNING, false);
+        boolean shareRouteDetails = prefs.getBoolean(SafeWayPrefs.GUARDIAN_SHARE_ROUTE_DETAILS, true);
+        boolean shareAiExcerpt = prefs.getBoolean(SafeWayPrefs.GUARDIAN_SHARE_AI_EXCERPT, false);
 
         if (serverUrl.isEmpty() || guardianToken == null || guardianToken.trim().isEmpty()) {
             post(callback, false, "푸시 서버 주소 또는 보호자 토큰이 없어 위험 알림을 보낼 수 없습니다.");
@@ -575,7 +634,7 @@ final class PushAlertClient {
         EXECUTOR.execute(() -> {
             HttpURLConnection connection = null;
             try {
-                String utterance = truncateForAlert(userText, 48);
+                String utterance = shareAiExcerpt ? truncateForAlert(userText, 48) : "";
                 JSONObject payload = new JSONObject();
                 payload.put("guardianToken", guardianToken.trim());
                 payload.put("status", "danger");
@@ -583,25 +642,29 @@ final class PushAlertClient {
                 payload.put("body", utterance.isEmpty()
                         ? "자녀가 AI 통화 중 위험 신호를 보냈습니다. 현재 상태를 확인하세요."
                         : "자녀가 AI 통화 중 \"" + utterance + "\"라고 말했습니다. 현재 상태를 확인하세요.");
-                if (location != null) {
+                if (shareLiveLocation && location != null) {
                     payload.put("mapsLink", buildMapsLink(location));
                     payload.put("latitude", String.format(Locale.US, "%.7f", location.getLatitude()));
                     payload.put("longitude", String.format(Locale.US, "%.7f", location.getLongitude()));
-                    if (routeLink == null || routeLink.trim().isEmpty()) {
+                    if (shareRouteDetails && (routeLink == null || routeLink.trim().isEmpty())) {
                         payload.put("routeLink", buildDirectionsLink(location, routeDestination));
                     }
                 }
-                if (routeLink != null && !routeLink.trim().isEmpty()) {
-                    payload.put("routeLink", routeLink.trim());
-                }
-                if (!routePoints.isEmpty()) {
-                    payload.put("routePoints", routePoints);
-                }
-                if (destination != null && !destination.trim().isEmpty()) {
-                    payload.put("destination", destination.trim());
-                }
-                if (expectedMinutes > 0) {
-                    payload.put("expectedMinutes", String.valueOf(expectedMinutes));
+                if (shareRouteDetails) {
+                    if (routeLink != null && !routeLink.trim().isEmpty()) {
+                        payload.put("routeLink", routeLink.trim());
+                    } else if (destination != null && !destination.trim().isEmpty() && !(shareLiveLocation && location != null)) {
+                        payload.put("routeLink", buildDirectionsLink(null, routeDestination));
+                    }
+                    if (!routePoints.isEmpty()) {
+                        payload.put("routePoints", routePoints);
+                    }
+                    if (destination != null && !destination.trim().isEmpty()) {
+                        payload.put("destination", destination.trim());
+                    }
+                    if (expectedMinutes > 0) {
+                        payload.put("expectedMinutes", String.valueOf(expectedMinutes));
+                    }
                 }
 
                 connection = openJsonPost(serverUrl + "/alerts/ai-danger", payload);
@@ -777,7 +840,6 @@ final class PushAlertClient {
         }
         SharedPreferences prefs = SafeWayPrefs.get(context);
         String status = state.optString("status", "").trim();
-        boolean resetLocationState = "linked".equals(status) || "notice".equals(status);
         long updatedAt = state.optLong("updatedAt", System.currentTimeMillis());
         if (updatedAt <= 0L) {
             updatedAt = System.currentTimeMillis();
@@ -786,14 +848,14 @@ final class PushAlertClient {
         prefs.edit()
                 .putString(SafeWayPrefs.LATEST_GUARDIAN_ALERT_TITLE, state.optString("title", ""))
                 .putString(SafeWayPrefs.LATEST_GUARDIAN_ALERT_BODY, state.optString("body", ""))
-                .putString(SafeWayPrefs.LATEST_GUARDIAN_ALERT_MAPS_LINK, resetLocationState ? "" : keepExistingIfEmpty(prefs, SafeWayPrefs.LATEST_GUARDIAN_ALERT_MAPS_LINK, state.optString("mapsLink", "")))
-                .putString(SafeWayPrefs.LATEST_GUARDIAN_ALERT_ROUTE_LINK, resetLocationState ? "" : keepExistingIfEmpty(prefs, SafeWayPrefs.LATEST_GUARDIAN_ALERT_ROUTE_LINK, state.optString("routeLink", "")))
-                .putString(SafeWayPrefs.LATEST_GUARDIAN_ALERT_ROUTE_POINTS, resetLocationState ? "" : keepExistingIfEmpty(prefs, SafeWayPrefs.LATEST_GUARDIAN_ALERT_ROUTE_POINTS, state.optString("routePoints", "")))
-                .putString(SafeWayPrefs.LATEST_GUARDIAN_ALERT_DESTINATION, resetLocationState ? "" : keepExistingIfEmpty(prefs, SafeWayPrefs.LATEST_GUARDIAN_ALERT_DESTINATION, state.optString("destination", "")))
+                .putString(SafeWayPrefs.LATEST_GUARDIAN_ALERT_MAPS_LINK, state.optString("mapsLink", ""))
+                .putString(SafeWayPrefs.LATEST_GUARDIAN_ALERT_ROUTE_LINK, state.optString("routeLink", ""))
+                .putString(SafeWayPrefs.LATEST_GUARDIAN_ALERT_ROUTE_POINTS, state.optString("routePoints", ""))
+                .putString(SafeWayPrefs.LATEST_GUARDIAN_ALERT_DESTINATION, state.optString("destination", ""))
                 .putString(SafeWayPrefs.LATEST_GUARDIAN_ALERT_STATUS, status)
-                .putString(SafeWayPrefs.LATEST_GUARDIAN_ALERT_LATITUDE, resetLocationState ? "" : keepExistingIfEmpty(prefs, SafeWayPrefs.LATEST_GUARDIAN_ALERT_LATITUDE, state.optString("latitude", "")))
-                .putString(SafeWayPrefs.LATEST_GUARDIAN_ALERT_LONGITUDE, resetLocationState ? "" : keepExistingIfEmpty(prefs, SafeWayPrefs.LATEST_GUARDIAN_ALERT_LONGITUDE, state.optString("longitude", "")))
-                .putInt(SafeWayPrefs.LATEST_GUARDIAN_ALERT_EXPECTED_MINUTES, resetLocationState ? 0 : keepExistingIntIfEmpty(prefs, state.optString("expectedMinutes", "")))
+                .putString(SafeWayPrefs.LATEST_GUARDIAN_ALERT_LATITUDE, state.optString("latitude", ""))
+                .putString(SafeWayPrefs.LATEST_GUARDIAN_ALERT_LONGITUDE, state.optString("longitude", ""))
+                .putInt(SafeWayPrefs.LATEST_GUARDIAN_ALERT_EXPECTED_MINUTES, parsePositiveInt(state.optString("expectedMinutes", "")))
                 .putLong(SafeWayPrefs.LATEST_GUARDIAN_ALERT_UPDATED_AT, updatedAt)
                 .putString(SafeWayPrefs.GUARDIAN_ALERT_HISTORY_JSON, normalizeHistoryJson(state.optJSONArray("history")))
                 .apply();
@@ -801,13 +863,6 @@ final class PushAlertClient {
 
     private static String normalizeHistoryJson(JSONArray history) {
         return history == null ? "[]" : history.toString();
-    }
-
-    private static String keepExistingIfEmpty(SharedPreferences prefs, String key, String value) {
-        if (value == null || value.trim().isEmpty()) {
-            return prefs.getString(key, "");
-        }
-        return value;
     }
 
     private static String compactRoutePoints(String routePoints) {
@@ -832,13 +887,6 @@ final class PushAlertClient {
             builder.append(pair);
         }
         return builder.toString();
-    }
-
-    private static int keepExistingIntIfEmpty(SharedPreferences prefs, String value) {
-        if (value == null || value.trim().isEmpty()) {
-            return prefs.getInt(SafeWayPrefs.LATEST_GUARDIAN_ALERT_EXPECTED_MINUTES, 0);
-        }
-        return parsePositiveInt(value);
     }
 
     private static int parsePositiveInt(String value) {

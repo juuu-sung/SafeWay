@@ -59,6 +59,7 @@ public class GuardianMonitorActivity extends AppCompatActivity {
     private static final String STATUS_DEVIATED = "deviated";
     private static final String STATUS_DANGER = "danger";
     private static final String STATUS_LINKED = "linked";
+    private static final String STATUS_UNLINKED = "unlinked";
     private static final String STATUS_NOTICE = "notice";
     private static final String LOCATION_ADDRESS_LOADING = "주소 확인 중...";
     private static final String LOCATION_ADDRESS_UNAVAILABLE = "주소를 확인할 수 없습니다.";
@@ -276,15 +277,21 @@ public class GuardianMonitorActivity extends AppCompatActivity {
         }
 
         boolean linked = STATUS_LINKED.equals(status);
+        boolean unlinked = STATUS_UNLINKED.equals(status);
         boolean notice = STATUS_NOTICE.equals(status);
         boolean completed = STATUS_COMPLETED.equals(status);
         boolean deviated = STATUS_DEVIATED.equals(status);
         boolean danger = STATUS_DANGER.equals(status);
-        boolean active = STATUS_ACTIVE.equals(status) || deviated || (!completed && !linked && !notice && hasAnyLink());
+        boolean active = STATUS_ACTIVE.equals(status) || deviated
+                || (!completed && !linked && !unlinked && !notice && hasAnyLink());
         boolean late = active && expectedMinutes > 0 && updatedAt > 0L
                 && System.currentTimeMillis() - updatedAt > expectedMinutes * 60000L;
 
-        if (linked) {
+        if (unlinked) {
+            applyStatus("연동 해제", R.drawable.bg_warning_soft, R.color.safeway_warning);
+            titleText.setText("보호자 연동이 해제되었습니다.");
+            descriptionText.setText(nonEmpty(body, "자녀 기기에서 보호자 연동을 해제했습니다."));
+        } else if (linked) {
             applyStatus("연동됨", R.drawable.bg_teal_soft, R.color.safeway_teal);
             titleText.setText("보호자 연결 완료");
             descriptionText.setText(nonEmpty(body, "자녀 기기와 보호자 모니터가 연결되었습니다."));
@@ -317,11 +324,11 @@ public class GuardianMonitorActivity extends AppCompatActivity {
         updatedText.setText(updatedAt > 0L
                 ? "마지막 업데이트 " + formatRelativeTime(updatedAt) + " · " + dateTimeFormat.format(new Date(updatedAt))
                 : "마지막 업데이트 정보 없음");
-        renderLocationMeta(linked, destination, latitude, longitude);
+        renderLocationMeta(linked, unlinked, destination, latitude, longitude);
         renderProgress(completed, active, late, updatedAt, expectedMinutes);
-        renderTimeline(linked, completed, active, late, updatedAt, expectedMinutes, destination);
+        renderTimeline(linked, unlinked, completed, active, late, updatedAt, expectedMinutes, destination);
         renderHistoryCalendar();
-        renderRecentEvents(linked, completed, active, late, updatedAt, destination);
+        renderRecentEvents(linked, unlinked, completed, active, late, updatedAt, destination);
         renderMap();
     }
 
@@ -340,9 +347,11 @@ public class GuardianMonitorActivity extends AppCompatActivity {
         renderHistoryCalendar();
     }
 
-    private void renderLocationMeta(boolean linked, String destination, String latitude, String longitude) {
-        if (linked) {
-            locationMetaText.setText("연동 완료. 자녀가 안심귀가를 시작하면 위치와 경로가 이 화면에 표시됩니다.");
+    private void renderLocationMeta(boolean linked, boolean unlinked, String destination, String latitude, String longitude) {
+        if (linked || unlinked) {
+            locationMetaText.setText(unlinked
+                    ? "연동이 해제되어 위치와 경로 정보를 더 이상 볼 수 없습니다."
+                    : "연동 완료. 자녀가 안심귀가를 시작하면 위치와 경로가 이 화면에 표시됩니다.");
             mapEmptyText.setVisibility(View.VISIBLE);
             return;
         }
@@ -443,10 +452,15 @@ public class GuardianMonitorActivity extends AppCompatActivity {
         updateProgressWidth(Math.max(8, percent));
     }
 
-    private void renderTimeline(boolean linked, boolean completed, boolean active, boolean late, long updatedAt,
+    private void renderTimeline(boolean linked, boolean unlinked, boolean completed, boolean active, boolean late, long updatedAt,
                                 int expectedMinutes, String destination) {
         timelineList.removeAllViews();
         String timeText = updatedAt > 0L ? dateTimeFormat.format(new Date(updatedAt)) : "시간 정보 없음";
+        if (unlinked) {
+            timelineList.addView(createInfoRow("보호자 연동 해제", timeText + " 자녀 기기와의 연결이 종료되었습니다."));
+            timelineList.addView(createInfoRow("다시 연결하려면", "자녀 기기와 새 연동 코드를 사용해주세요."));
+            return;
+        }
         if (linked) {
             timelineList.addView(createInfoRow("보호자 연동 완료", timeText + " 자녀 기기와 연결되었습니다."));
             timelineList.addView(createInfoRow("다음 단계", "자녀가 안심귀가를 시작하면 위치와 경로 알림을 받습니다."));
@@ -471,9 +485,9 @@ public class GuardianMonitorActivity extends AppCompatActivity {
         timelineList.addView(createInfoRow("알림 수신", timeText + " 보호자 알림을 받았습니다."));
     }
 
-    private void renderRecentEvents(boolean linked, boolean completed, boolean active, boolean late, long updatedAt, String destination) {
+    private void renderRecentEvents(boolean linked, boolean unlinked, boolean completed, boolean active, boolean late, long updatedAt, String destination) {
         recentEventsList.removeAllViews();
-        String state = linked ? "연동됨" : completed ? "완료" : late ? "시간 초과" : active ? "귀가 중" : "알림";
+        String state = unlinked ? "연동 해제" : linked ? "연동됨" : completed ? "완료" : late ? "시간 초과" : active ? "귀가 중" : "알림";
         String when = updatedAt > 0L ? dateTimeFormat.format(new Date(updatedAt)) : "시간 정보 없음";
         String desc = destination == null || destination.trim().isEmpty()
                 ? when

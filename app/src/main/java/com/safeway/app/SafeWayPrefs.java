@@ -18,6 +18,9 @@ final class SafeWayPrefs {
     static final String GUARDIAN_PHONE = "guardian_phone";
     static final String GUARDIAN_RELATION = "guardian_relation";
     static final String GUARDIAN_PUSH_TOKEN = "guardian_push_token";
+    static final String GUARDIAN_SHARE_LIVE_LOCATION = "guardian_share_live_location";
+    static final String GUARDIAN_SHARE_ROUTE_DETAILS = "guardian_share_route_details";
+    static final String GUARDIAN_SHARE_AI_EXCERPT = "guardian_share_ai_excerpt";
     static final String PUSH_SERVER_URL = "push_server_url";
     static final String DEVICE_PUSH_TOKEN = "device_push_token";
     static final String DEVICE_PUSH_TOKEN_STATUS = "device_push_token_status";

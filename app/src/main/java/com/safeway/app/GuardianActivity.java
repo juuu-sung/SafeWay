@@ -10,13 +10,16 @@ import android.content.pm.PackageManager;
 import android.graphics.Typeface;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.View;
 import android.widget.EditText;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.SwitchCompat;
 
 public class GuardianActivity extends AppCompatActivity {
     private static final int REQUEST_PUSH_NOTIFICATION = 60;
@@ -33,20 +36,24 @@ public class GuardianActivity extends AppCompatActivity {
     private TextView guardianProfileInitialText;
     private TextView guardianProfileRelationText;
     private TextView guardianProfileTokenText;
-    private TextView devicePushTokenText;
-    private TextView devicePushTokenStatusText;
     private TextView pushConnectionStatusText;
     private TextView generatedPairingCodeText;
     private TextView pairingStatusText;
+    private TextView shareScopeSummaryText;
     private TextView themePinkButton;
     private TextView themeBlueButton;
+    private View guardianActions;
+    private View pairingCard;
+    private View unlinkGuardianButton;
     private EditText myNameInput;
     private EditText myPhoneInput;
     private EditText nameInput;
     private EditText phoneInput;
-    private EditText guardianPushTokenInput;
     private EditText pairingCodeInput;
     private EditText pushServerUrlInput;
+    private SwitchCompat shareLiveLocationSwitch;
+    private SwitchCompat shareRouteDetailsSwitch;
+    private SwitchCompat shareAiExcerptSwitch;
     private RadioGroup relationGroup;
     private RadioButton relationParent;
     private RadioButton relationFriend;
@@ -74,20 +81,24 @@ public class GuardianActivity extends AppCompatActivity {
         guardianProfileInitialText = findViewById(R.id.guardianProfileInitialText);
         guardianProfileRelationText = findViewById(R.id.guardianProfileRelationText);
         guardianProfileTokenText = findViewById(R.id.guardianProfileTokenText);
-        devicePushTokenText = findViewById(R.id.devicePushTokenText);
-        devicePushTokenStatusText = findViewById(R.id.devicePushTokenStatusText);
         pushConnectionStatusText = findViewById(R.id.pushConnectionStatusText);
         generatedPairingCodeText = findViewById(R.id.generatedPairingCodeText);
         pairingStatusText = findViewById(R.id.pairingStatusText);
+        shareScopeSummaryText = findViewById(R.id.shareScopeSummaryText);
         themePinkButton = findViewById(R.id.themePinkButton);
         themeBlueButton = findViewById(R.id.themeBlueButton);
+        guardianActions = findViewById(R.id.guardianActions);
+        pairingCard = findViewById(R.id.pairingCard);
+        unlinkGuardianButton = findViewById(R.id.unlinkGuardianButton);
         myNameInput = findViewById(R.id.myNameInput);
         myPhoneInput = findViewById(R.id.myPhoneInput);
         nameInput = findViewById(R.id.guardianNameInput);
         phoneInput = findViewById(R.id.guardianPhoneInput);
-        guardianPushTokenInput = findViewById(R.id.guardianPushTokenInput);
         pairingCodeInput = findViewById(R.id.pairingCodeInput);
         pushServerUrlInput = findViewById(R.id.pushServerUrlInput);
+        shareLiveLocationSwitch = findViewById(R.id.shareLiveLocationSwitch);
+        shareRouteDetailsSwitch = findViewById(R.id.shareRouteDetailsSwitch);
+        shareAiExcerptSwitch = findViewById(R.id.shareAiExcerptSwitch);
         relationGroup = findViewById(R.id.relationGroup);
         relationParent = findViewById(R.id.relationParent);
         relationFriend = findViewById(R.id.relationFriend);
@@ -104,11 +115,11 @@ public class GuardianActivity extends AppCompatActivity {
         findViewById(R.id.createPairingCodeButton).setOnClickListener(v -> createPairingCode());
         findViewById(R.id.copyPairingCodeButton).setOnClickListener(v -> copyPairingCode());
         findViewById(R.id.claimPairingCodeButton).setOnClickListener(v -> claimPairingCode());
-        findViewById(R.id.copyDevicePushTokenButton).setOnClickListener(v -> copyDevicePushToken());
         findViewById(R.id.checkPushServerButton).setOnClickListener(v -> checkPushServer());
         findViewById(R.id.sendTestPushButton).setOnClickListener(v -> sendTestPush());
+        findViewById(R.id.saveShareScopeButton).setOnClickListener(v -> saveShareScope());
+        unlinkGuardianButton.setOnClickListener(v -> confirmUnlinkGuardian());
         ensurePushNotificationPermission();
-        devicePushTokenText.postDelayed(this::updateDevicePushTokenText, 1200);
         updateThemeButtons();
     }
 
@@ -118,7 +129,7 @@ public class GuardianActivity extends AppCompatActivity {
         renderMyProfile();
         renderGuardianProfile();
         updatePairingStatus();
-        updateDevicePushTokenText();
+        updateShareScopeSummary();
     }
 
     private void loadGuardian() {
@@ -127,7 +138,6 @@ public class GuardianActivity extends AppCompatActivity {
         String name = prefs.getString(SafeWayPrefs.GUARDIAN_NAME, "");
         String phone = prefs.getString(SafeWayPrefs.GUARDIAN_PHONE, "");
         String relation = prefs.getString(SafeWayPrefs.GUARDIAN_RELATION, "부모님");
-        String guardianPushToken = prefs.getString(SafeWayPrefs.GUARDIAN_PUSH_TOKEN, "");
         String pushServerUrl = prefs.getString(SafeWayPrefs.PUSH_SERVER_URL, "");
 
         myNameInput.setText(myName);
@@ -136,10 +146,13 @@ public class GuardianActivity extends AppCompatActivity {
             nameInput.setText(name);
             phoneInput.setText(phone);
         }
-        guardianPushTokenInput.setText(guardianPushToken);
         pushServerUrlInput.setText(pushServerUrl);
+        shareLiveLocationSwitch.setChecked(prefs.getBoolean(SafeWayPrefs.GUARDIAN_SHARE_LIVE_LOCATION, true));
+        shareRouteDetailsSwitch.setChecked(prefs.getBoolean(SafeWayPrefs.GUARDIAN_SHARE_ROUTE_DETAILS, true));
+        shareAiExcerptSwitch.setChecked(prefs.getBoolean(SafeWayPrefs.GUARDIAN_SHARE_AI_EXCERPT, false));
         renderMyProfile();
         renderGuardianProfile();
+        updateShareScopeSummary();
         updatePushStatus("서버 연결과 테스트 알림을 확인해주세요.", false);
         updatePairingStatus();
 
@@ -171,13 +184,11 @@ public class GuardianActivity extends AppCompatActivity {
             return;
         }
         String relation = getSelectedRelation();
-        String guardianPushToken = guardianPushTokenInput.getText().toString().trim();
         String pushServerUrl = pushServerUrlInput.getText().toString().trim();
         prefs.edit()
                 .putString(SafeWayPrefs.GUARDIAN_NAME, name)
                 .putString(SafeWayPrefs.GUARDIAN_PHONE, phone)
                 .putString(SafeWayPrefs.GUARDIAN_RELATION, relation)
-                .putString(SafeWayPrefs.GUARDIAN_PUSH_TOKEN, guardianPushToken)
                 .putString(SafeWayPrefs.PUSH_SERVER_URL, pushServerUrl)
                 .apply();
         renderGuardianProfile();
@@ -196,12 +207,8 @@ public class GuardianActivity extends AppCompatActivity {
     }
 
     private void sendTestPush() {
-        String guardianPushToken = guardianPushTokenInput.getText().toString().trim();
-        String pushServerUrl = pushServerUrlInput.getText().toString().trim();
-        prefs.edit()
-                .putString(SafeWayPrefs.GUARDIAN_PUSH_TOKEN, guardianPushToken)
-                .putString(SafeWayPrefs.PUSH_SERVER_URL, pushServerUrl)
-                .apply();
+        String guardianPushToken = prefs.getString(SafeWayPrefs.GUARDIAN_PUSH_TOKEN, "");
+        String pushServerUrl = prefs.getString(SafeWayPrefs.PUSH_SERVER_URL, "");
         updatePushStatus("테스트 알림을 보내는 중입니다.", false);
         PushAlertClient.sendTestAlert(pushServerUrl, guardianPushToken, (ok, message) -> {
             updatePushStatus(message, ok);
@@ -216,7 +223,6 @@ public class GuardianActivity extends AppCompatActivity {
         String devicePushToken = prefs.getString(SafeWayPrefs.DEVICE_PUSH_TOKEN, "");
         if (devicePushToken == null || devicePushToken.trim().isEmpty()) {
             FcmTokenManager.refreshDeviceToken(this);
-            updateDevicePushTokenText();
             updatePushStatus("이 기기의 푸시 토큰을 준비하는 중입니다. 잠시 후 다시 시도해주세요.", false);
             Toast.makeText(this, "푸시 토큰 준비 후 다시 시도해주세요.", Toast.LENGTH_SHORT).show();
             return;
@@ -294,7 +300,6 @@ public class GuardianActivity extends AppCompatActivity {
                         .apply();
                 nameInput.setText(name);
                 phoneInput.setText(result.guardianPhone);
-                guardianPushTokenInput.setText(result.guardianToken);
                 selectRelation(relation);
                 renderGuardianProfile();
                 updatePairingStatus();
@@ -317,10 +322,12 @@ public class GuardianActivity extends AppCompatActivity {
         String relation = prefs.getString(SafeWayPrefs.GUARDIAN_RELATION, "보호자");
         if (token != null && !token.trim().isEmpty()) {
             String label = name == null || name.trim().isEmpty() ? "보호자" : name.trim();
-            updateConnectionHeader(true, "보호자 알림 연결됨", label + "에게 안심귀가 시작, 완료, 경로 이탈 알림이 전송됩니다.");
+            updateConnectionHeader(true, "보호자 알림 연결됨", label + "에게 기본 안전 알림이 전송됩니다. 상세 공유 범위는 아래에서 관리할 수 있습니다.");
             pairingStatusText.setText("연동 완료\n" + label + " · " + relation + " 프로필로 보호자 모니터가 연결되어 있습니다.");
             pairingStatusText.setTextColor(getColor(R.color.safeway_teal));
             pairingStatusText.setBackgroundResource(R.drawable.bg_teal_soft);
+            pairingCard.setVisibility(View.GONE);
+            guardianActions.setVisibility(View.VISIBLE);
             renderGuardianProfile();
             return;
         }
@@ -328,7 +335,90 @@ public class GuardianActivity extends AppCompatActivity {
         pairingStatusText.setText("연동 전입니다.\n보호자 기기에서 코드를 만들거나 자녀 기기에서 받은 코드를 입력해주세요.");
         pairingStatusText.setTextColor(getColor(R.color.safeway_warning));
         pairingStatusText.setBackgroundResource(R.drawable.bg_warning_soft);
+        pairingCard.setVisibility(View.VISIBLE);
+        guardianActions.setVisibility(View.GONE);
         renderGuardianProfile();
+    }
+
+    private void saveShareScope() {
+        prefs.edit()
+                .putBoolean(SafeWayPrefs.GUARDIAN_SHARE_LIVE_LOCATION, shareLiveLocationSwitch.isChecked())
+                .putBoolean(SafeWayPrefs.GUARDIAN_SHARE_ROUTE_DETAILS, shareRouteDetailsSwitch.isChecked())
+                .putBoolean(SafeWayPrefs.GUARDIAN_SHARE_AI_EXCERPT, shareAiExcerptSwitch.isChecked())
+                .apply();
+        updateShareScopeSummary();
+        Toast.makeText(this, "보호자 공유 범위를 저장했습니다.", Toast.LENGTH_SHORT).show();
+    }
+
+    private void updateShareScopeSummary() {
+        boolean liveLocation = prefs.getBoolean(SafeWayPrefs.GUARDIAN_SHARE_LIVE_LOCATION, true);
+        boolean routeDetails = prefs.getBoolean(SafeWayPrefs.GUARDIAN_SHARE_ROUTE_DETAILS, true);
+        boolean aiExcerpt = prefs.getBoolean(SafeWayPrefs.GUARDIAN_SHARE_AI_EXCERPT, false);
+        shareScopeSummaryText.setText(
+                "항상 공유: 귀가 시작·완료, 경로 이탈, 위험 감지\n"
+                        + "상세 정보: 위치 " + onOff(liveLocation)
+                        + " · 목적지/경로 " + onOff(routeDetails)
+                        + " · AI 발화 일부 " + onOff(aiExcerpt)
+        );
+    }
+
+    private String onOff(boolean enabled) {
+        return enabled ? "켬" : "끔";
+    }
+
+    private void confirmUnlinkGuardian() {
+        String name = prefs.getString(SafeWayPrefs.GUARDIAN_NAME, "보호자");
+        String label = name == null || name.trim().isEmpty() ? "보호자" : name.trim();
+        new AlertDialog.Builder(this)
+                .setTitle("보호자 연동을 해제할까요?")
+                .setMessage(label + " 기기에서 더 이상 귀가 상태를 볼 수 없고, 새 알림도 전송되지 않습니다.")
+                .setNegativeButton("취소", null)
+                .setPositiveButton("연동 해제", (dialog, which) -> unlinkGuardian())
+                .show();
+    }
+
+    private void unlinkGuardian() {
+        unlinkGuardianButton.setEnabled(false);
+        guardianProfileTokenText.setText("서버에서 보호자 접근 권한을 해제하는 중입니다.");
+        PushAlertClient.unlinkGuardian(this, (ok, message) -> {
+            unlinkGuardianButton.setEnabled(true);
+            if (ok) {
+                clearGuardianLink();
+                updatePushStatus(message, true);
+            } else {
+                renderGuardianProfile();
+            }
+            Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+        });
+    }
+
+    private void clearGuardianLink() {
+        prefs.edit()
+                .remove(SafeWayPrefs.GUARDIAN_NAME)
+                .remove(SafeWayPrefs.GUARDIAN_PHONE)
+                .remove(SafeWayPrefs.GUARDIAN_RELATION)
+                .remove(SafeWayPrefs.GUARDIAN_PUSH_TOKEN)
+                .remove(SafeWayPrefs.LATEST_GUARDIAN_ALERT_TITLE)
+                .remove(SafeWayPrefs.LATEST_GUARDIAN_ALERT_BODY)
+                .remove(SafeWayPrefs.LATEST_GUARDIAN_ALERT_MAPS_LINK)
+                .remove(SafeWayPrefs.LATEST_GUARDIAN_ALERT_ROUTE_LINK)
+                .remove(SafeWayPrefs.LATEST_GUARDIAN_ALERT_ROUTE_POINTS)
+                .remove(SafeWayPrefs.LATEST_GUARDIAN_ALERT_DESTINATION)
+                .remove(SafeWayPrefs.LATEST_GUARDIAN_ALERT_STATUS)
+                .remove(SafeWayPrefs.LATEST_GUARDIAN_ALERT_LATITUDE)
+                .remove(SafeWayPrefs.LATEST_GUARDIAN_ALERT_LONGITUDE)
+                .remove(SafeWayPrefs.LATEST_GUARDIAN_ALERT_EXPECTED_MINUTES)
+                .remove(SafeWayPrefs.LATEST_GUARDIAN_ALERT_UPDATED_AT)
+                .remove(SafeWayPrefs.GUARDIAN_ALERT_HISTORY_JSON)
+                .apply();
+        nameInput.setText("");
+        phoneInput.setText("");
+        selectRelation("부모님");
+        pairingCodeInput.setText("");
+        latestPairingCode = "";
+        generatedPairingCodeText.setText("연동 코드 없음");
+        renderGuardianProfile();
+        updatePairingStatus();
     }
 
     private void updateConnectionHeader(boolean linked, String title, String detail) {
@@ -424,30 +514,6 @@ public class GuardianActivity extends AppCompatActivity {
             return digits.substring(0, 3) + "-" + digits.substring(3, 7) + "-" + digits.substring(7);
         }
         return phone;
-    }
-
-    private void updateDevicePushTokenText() {
-        String token = prefs.getString(SafeWayPrefs.DEVICE_PUSH_TOKEN, "");
-        String status = prefs.getString(SafeWayPrefs.DEVICE_PUSH_TOKEN_STATUS, "토큰을 준비하는 중입니다.");
-        devicePushTokenStatusText.setText(status);
-        if (token == null || token.trim().isEmpty()) {
-            devicePushTokenText.setText("아직 토큰이 없습니다. Firebase 설정 후 다시 열어주세요.");
-            return;
-        }
-        devicePushTokenText.setText(token);
-    }
-
-    private void copyDevicePushToken() {
-        String token = prefs.getString(SafeWayPrefs.DEVICE_PUSH_TOKEN, "");
-        if (token == null || token.trim().isEmpty()) {
-            Toast.makeText(this, "복사할 푸시 토큰이 아직 없습니다.", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-        if (clipboard != null) {
-            clipboard.setPrimaryClip(ClipData.newPlainText("SafeWay FCM Token", token));
-            Toast.makeText(this, "이 기기의 푸시 토큰을 복사했습니다.", Toast.LENGTH_SHORT).show();
-        }
     }
 
     private void ensurePushNotificationPermission() {

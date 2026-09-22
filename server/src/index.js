@@ -1007,6 +1007,45 @@ app.post("/guardians/link", async (req, res) => {
   });
 });
 
+app.post("/guardians/unlink", async (req, res) => {
+  const guardianToken = optionalString(req.body.guardianToken);
+  if (!guardianToken) {
+    res.status(400).json({ ok: false, error: "guardianToken is required" });
+    return;
+  }
+
+  for (const [code, pairing] of guardianPairingCodes.entries()) {
+    if (pairing && pairing.guardianToken === guardianToken) {
+      guardianPairingCodes.delete(code);
+    }
+  }
+
+  const unlinkedState = buildGuardianStateFromFields({
+    type: "GUARDIAN_UNLINKED",
+    title: "SafeWay 보호자 연동 해제",
+    body: "자녀 기기에서 보호자 연동을 해제했습니다.",
+    status: "unlinked",
+  });
+  let notificationSent = false;
+  try {
+    initFirebase();
+    await admin.messaging().send({
+      token: guardianToken,
+      data: guardianPushData(unlinkedState),
+      android: {
+        priority: "high",
+      },
+    });
+    notificationSent = true;
+  } catch (error) {
+    console.error("Guardian unlink notification failed", error);
+  }
+
+  guardianReturnStates.delete(guardianToken);
+  persistGuardianReturnStates();
+  res.json({ ok: true, notificationSent });
+});
+
 app.post("/ai/chat", async (req, res) => {
   const userText = optionalString(req.body.userText);
   const mode = optionalString(req.body.mode) || "보호자";

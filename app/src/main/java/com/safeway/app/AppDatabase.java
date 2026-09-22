@@ -5,13 +5,16 @@ import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
+import android.location.Location;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public class AppDatabase extends SQLiteOpenHelper {
     private static final String DB_NAME = "safeway.db";
     private static final int DB_VERSION = 6;
+    private static final float DANGER_MEMO_DUPLICATE_RADIUS_METERS = 30f;
 
     public AppDatabase(Context context) {
         super(context, DB_NAME, null, DB_VERSION);
@@ -167,20 +170,165 @@ public class AppDatabase extends SQLiteOpenHelper {
 
     long insertDangerMemo(String placeName, String reason, String memo, String createdAt,
                           String latitude, String longitude, String locationAddress) {
-        ContentValues values = new ContentValues();
-        values.put("place_name", placeName);
-        values.put("reason", reason);
-        values.put("memo", memo == null ? "" : memo);
-        values.put("latitude", latitude == null ? "" : latitude);
-        values.put("longitude", longitude == null ? "" : longitude);
-        values.put("location_address", locationAddress == null ? "" : locationAddress);
-        values.put("created_at", createdAt);
-        return getWritableDatabase().insert("danger_memos", null, values);
+        return saveDangerMemo(
+                -1,
+                placeName,
+                reason,
+                memo,
+                createdAt,
+                latitude,
+                longitude,
+                locationAddress
+        ).id;
+    }
+
+    DangerMemoWriteResult saveDangerMemo(int editingMemoId, String placeName, String reason,
+                                         String memo, String createdAt, String latitude,
+                                         String longitude, String locationAddress) {
+        SQLiteDatabase database = getWritableDatabase();
+        database.beginTransaction();
+        try {
+            DangerMemo editingMemo = editingMemoId > 0 ? getDangerMemo(database, editingMemoId) : null;
+            DangerMemo duplicate = findDuplicateDangerMemo(
+                    database,
+                    editingMemoId,
+                    placeName,
+                    reason,
+                    latitude,
+                    longitude
+            );
+
+            if (duplicate != null) {
+                DangerMemo incoming = new DangerMemo(
+                        editingMemoId,
+                        placeName,
+                        reason,
+                        memo,
+                        latitude,
+                        longitude,
+                        locationAddress,
+                        createdAt
+                );
+                DangerMemo merged = mergeDangerMemos(duplicate, incoming);
+                database.update(
+                        "danger_memos",
+                        dangerMemoValues(merged),
+                        "id = ?",
+                        new String[]{String.valueOf(duplicate.id)}
+                );
+                if (editingMemo != null && editingMemo.id != duplicate.id) {
+                    database.delete(
+                            "danger_memos",
+                            "id = ?",
+                            new String[]{String.valueOf(editingMemo.id)}
+                    );
+                }
+                database.setTransactionSuccessful();
+                return new DangerMemoWriteResult(duplicate.id, DangerMemoWriteType.MERGED);
+            }
+
+            ContentValues values = dangerMemoValues(
+                    new DangerMemo(
+                            editingMemoId,
+                            placeName,
+                            reason,
+                            memo,
+                            latitude,
+                            longitude,
+                            locationAddress,
+                            createdAt
+                    )
+            );
+            if (editingMemo != null) {
+                int updated = database.update(
+                        "danger_memos",
+                        values,
+                        "id = ?",
+                        new String[]{String.valueOf(editingMemo.id)}
+                );
+                database.setTransactionSuccessful();
+                return new DangerMemoWriteResult(
+                        updated > 0 ? editingMemo.id : -1,
+                        DangerMemoWriteType.UPDATED
+                );
+            }
+
+            long id = database.insert("danger_memos", null, values);
+            database.setTransactionSuccessful();
+            return new DangerMemoWriteResult(id, DangerMemoWriteType.INSERTED);
+        } finally {
+            database.endTransaction();
+        }
     }
 
     List<DangerMemo> getDangerMemos() {
+        return getDangerMemos(getReadableDatabase());
+    }
+
+    boolean deleteDangerMemo(int id) {
+        return getWritableDatabase().delete(
+                "danger_memos",
+                "id = ?",
+                new String[]{String.valueOf(id)}
+        ) > 0;
+    }
+
+    int countDuplicateDangerMemos() {
+        List<DangerMemo> memos = getDangerMemos();
+        ArrayList<DangerMemo> uniqueMemos = new ArrayList<>();
+        int duplicateCount = 0;
+        for (DangerMemo memo : memos) {
+            if (findDuplicateIndex(uniqueMemos, memo) >= 0) {
+                duplicateCount++;
+            } else {
+                uniqueMemos.add(memo);
+            }
+        }
+        return duplicateCount;
+    }
+
+    int mergeDuplicateDangerMemos() {
+        SQLiteDatabase database = getWritableDatabase();
+        database.beginTransaction();
+        try {
+            List<DangerMemo> memos = getDangerMemos(database);
+            ArrayList<DangerMemo> uniqueMemos = new ArrayList<>();
+            int mergedCount = 0;
+
+            for (DangerMemo memo : memos) {
+                int duplicateIndex = findDuplicateIndex(uniqueMemos, memo);
+                if (duplicateIndex < 0) {
+                    uniqueMemos.add(memo);
+                    continue;
+                }
+
+                DangerMemo survivor = uniqueMemos.get(duplicateIndex);
+                DangerMemo merged = mergeDangerMemos(survivor, memo);
+                database.update(
+                        "danger_memos",
+                        dangerMemoValues(merged),
+                        "id = ?",
+                        new String[]{String.valueOf(survivor.id)}
+                );
+                database.delete(
+                        "danger_memos",
+                        "id = ?",
+                        new String[]{String.valueOf(memo.id)}
+                );
+                uniqueMemos.set(duplicateIndex, merged);
+                mergedCount++;
+            }
+
+            database.setTransactionSuccessful();
+            return mergedCount;
+        } finally {
+            database.endTransaction();
+        }
+    }
+
+    private List<DangerMemo> getDangerMemos(SQLiteDatabase database) {
         ArrayList<DangerMemo> memos = new ArrayList<>();
-        Cursor cursor = getReadableDatabase().query(
+        Cursor cursor = database.query(
                 "danger_memos",
                 null,
                 null,
@@ -206,6 +354,170 @@ public class AppDatabase extends SQLiteOpenHelper {
             cursor.close();
         }
         return memos;
+    }
+
+    private DangerMemo getDangerMemo(SQLiteDatabase database, int id) {
+        Cursor cursor = database.query(
+                "danger_memos",
+                null,
+                "id = ?",
+                new String[]{String.valueOf(id)},
+                null,
+                null,
+                null,
+                "1"
+        );
+        try {
+            if (!cursor.moveToFirst()) {
+                return null;
+            }
+            return dangerMemoFromCursor(cursor);
+        } finally {
+            cursor.close();
+        }
+    }
+
+    private DangerMemo findDuplicateDangerMemo(SQLiteDatabase database, int excludedId,
+                                                String placeName, String reason,
+                                                String latitude, String longitude) {
+        DangerMemo candidate = new DangerMemo(
+                excludedId,
+                placeName,
+                reason,
+                "",
+                latitude,
+                longitude,
+                "",
+                ""
+        );
+        for (DangerMemo memo : getDangerMemos(database)) {
+            if (memo.id != excludedId && areDuplicateDangerMemos(memo, candidate)) {
+                return memo;
+            }
+        }
+        return null;
+    }
+
+    private int findDuplicateIndex(List<DangerMemo> memos, DangerMemo candidate) {
+        for (int index = 0; index < memos.size(); index++) {
+            if (areDuplicateDangerMemos(memos.get(index), candidate)) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    private boolean areDuplicateDangerMemos(DangerMemo first, DangerMemo second) {
+        String firstReason = normalizeDangerMemoText(first.reason);
+        String secondReason = normalizeDangerMemoText(second.reason);
+        if (firstReason.isEmpty() || !firstReason.equals(secondReason)) {
+            return false;
+        }
+
+        String firstPlace = normalizeDangerMemoText(first.placeName);
+        String secondPlace = normalizeDangerMemoText(second.placeName);
+        if (!firstPlace.isEmpty() && firstPlace.equals(secondPlace)) {
+            return true;
+        }
+
+        double[] firstPoint = parseDangerMemoPoint(first.latitude, first.longitude);
+        double[] secondPoint = parseDangerMemoPoint(second.latitude, second.longitude);
+        if (firstPoint == null || secondPoint == null) {
+            return false;
+        }
+        float[] distance = new float[1];
+        Location.distanceBetween(
+                firstPoint[0],
+                firstPoint[1],
+                secondPoint[0],
+                secondPoint[1],
+                distance
+        );
+        return distance[0] <= DANGER_MEMO_DUPLICATE_RADIUS_METERS;
+    }
+
+    private String normalizeDangerMemoText(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.trim()
+                .toLowerCase(Locale.KOREA)
+                .replaceAll("[\\s\\p{Punct}·ㆍ]+", "");
+    }
+
+    private double[] parseDangerMemoPoint(String latitude, String longitude) {
+        if (latitude == null || longitude == null
+                || latitude.trim().isEmpty() || longitude.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return new double[]{
+                    Double.parseDouble(latitude.trim()),
+                    Double.parseDouble(longitude.trim())
+            };
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private DangerMemo mergeDangerMemos(DangerMemo primary, DangerMemo secondary) {
+        return new DangerMemo(
+                primary.id,
+                preferNonEmpty(primary.placeName, secondary.placeName),
+                preferNonEmpty(primary.reason, secondary.reason),
+                mergeMemoDetails(primary.memo, secondary.memo),
+                preferNonEmpty(primary.latitude, secondary.latitude),
+                preferNonEmpty(primary.longitude, secondary.longitude),
+                preferNonEmpty(primary.locationAddress, secondary.locationAddress),
+                preferNonEmpty(primary.createdAt, secondary.createdAt)
+        );
+    }
+
+    private String mergeMemoDetails(String primary, String secondary) {
+        String first = primary == null ? "" : primary.trim();
+        String second = secondary == null ? "" : secondary.trim();
+        if (first.isEmpty()) {
+            return second;
+        }
+        if (second.isEmpty() || first.equals(second) || first.contains(second)) {
+            return first;
+        }
+        if (second.contains(first)) {
+            return second;
+        }
+        return first + " · " + second;
+    }
+
+    private String preferNonEmpty(String primary, String secondary) {
+        if (primary != null && !primary.trim().isEmpty()) {
+            return primary.trim();
+        }
+        return secondary == null ? "" : secondary.trim();
+    }
+
+    private ContentValues dangerMemoValues(DangerMemo memo) {
+        ContentValues values = new ContentValues();
+        values.put("place_name", memo.placeName);
+        values.put("reason", memo.reason);
+        values.put("memo", memo.memo);
+        values.put("latitude", memo.latitude);
+        values.put("longitude", memo.longitude);
+        values.put("location_address", memo.locationAddress);
+        values.put("created_at", memo.createdAt);
+        return values;
+    }
+
+    private DangerMemo dangerMemoFromCursor(Cursor cursor) {
+        return new DangerMemo(
+                cursor.getInt(cursor.getColumnIndexOrThrow("id")),
+                cursor.getString(cursor.getColumnIndexOrThrow("place_name")),
+                cursor.getString(cursor.getColumnIndexOrThrow("reason")),
+                cursor.getString(cursor.getColumnIndexOrThrow("memo")),
+                getOptionalString(cursor, "latitude"),
+                getOptionalString(cursor, "longitude"),
+                getOptionalString(cursor, "location_address"),
+                cursor.getString(cursor.getColumnIndexOrThrow("created_at"))
+        );
     }
 
     private String getOptionalString(Cursor cursor, String columnName) {
@@ -288,6 +600,26 @@ public class AppDatabase extends SQLiteOpenHelper {
             this.longitude = longitude == null ? "" : longitude;
             this.locationAddress = locationAddress == null ? "" : locationAddress;
             this.createdAt = createdAt;
+        }
+    }
+
+    enum DangerMemoWriteType {
+        INSERTED,
+        UPDATED,
+        MERGED
+    }
+
+    static class DangerMemoWriteResult {
+        final long id;
+        final DangerMemoWriteType type;
+
+        DangerMemoWriteResult(long id, DangerMemoWriteType type) {
+            this.id = id;
+            this.type = type;
+        }
+
+        boolean isSuccessful() {
+            return id > 0;
         }
     }
 }

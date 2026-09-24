@@ -30,6 +30,12 @@ final class SafeWayPrefs {
     static final String ROUTE_LAST_LINK = "route_last_link";
     static final String ROUTE_LAST_POINTS = "route_last_points";
     static final String ROUTE_LAST_GUIDES = "route_last_guides";
+    static final String ROUTE_MODE = "route_mode";
+    static final String ROUTE_LAST_DISTANCE_METERS = "route_last_distance_meters";
+    static final String ROUTE_NAVIGABLE = "route_navigable";
+    static final String NAV_STATE = "navigation_state";
+    static final String NAV_VOICE = "navigation_voice_enabled";
+    static final String NAV_ALERT_TIME = "navigation_alert_time";
     static final String ROUTE_EXPECTED_MINUTES = "route_expected_minutes";
     static final String ACTUAL_ROUTE_POINTS = "actual_route_points";
     static final String HOME_DESTINATION = "home_destination";

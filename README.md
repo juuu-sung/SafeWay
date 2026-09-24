@@ -42,7 +42,40 @@
 - AI 안심 동행 통화 화면, 음성 입력, TTS 응답
 - 위험 키워드 감지 및 112/보호자 연락 유도
 - 카카오 지도 기반 도착지 검색, 현재 위치 표시, 도보 경로 표시
+- 앱 내 도보 안내: 구간별 안내·한국어 음성·남은 경로·이탈 시 자동 재탐색
 - 귀가 기록과 위험 지역 메모를 SQLite에 저장
+
+## 앱 내 도보 안내
+
+실제 카카오 도보 경로를 계산하고 귀가를 시작하면 홈 화면과 도보 안내 화면이 동일한 안내 상태를 표시합니다. 이전에 저장한 경로는 한 번 다시 계산해야 합니다. 직선 참고선은 내비게이션 경로로 사용하지 않습니다.
+
+- 안내 화면에서 **음성 켜기/끄기**, **경로 다시 찾기**를 사용할 수 있습니다. 한국어 음성 데이터가 없는 기기에서는 화면 안내를 사용합니다.
+- 귀가 추적 서비스가 위치·안내 상태를 관리하므로 앱이 뒤로 가도 계속 동작합니다. 알림에서 안내 화면을 열거나 음성을 전환할 수 있습니다.
+- 오래되거나 부정확한 위치, 갑작스러운 GPS 이동은 방향 안내에서 제외합니다. 이탈과 도착은 여러 위치 표본으로 확인하며, 도착 후 귀가 완료는 사용자가 직접 누릅니다.
+- 재탐색은 기존 경로를 보존하면서 수행합니다. 실패하면 재시도 간격을 늘리고, 도착지 변경·귀가 종료 뒤 도착한 응답은 반영하지 않습니다. 네트워크 없이는 새 경로를 계산할 수 없습니다.
+- 위험 메모 주변 우회 후보를 비교하되 모든 위험 지역 회피나 실제 도로의 안전성을 보장하지 않습니다.
+
+빌드·정적 검사·경로 계산 회귀 테스트:
+
+```bash
+./gradlew :app:assembleDebug :app:lintDebug :app:navigationEngineTest
+```
+
+전용 에뮬레이터에서 모의 위치 권한과 위치·알림 권한을 부여한 뒤 Android 통합 테스트를 실행할 수 있습니다. 테스트는 공개 좌표와 로컬 응답 서버를 사용하며 카카오 요청이나 보호자 메시지를 보내지 않습니다. 앱 설정은 테스트 후 복원합니다.
+
+```bash
+./gradlew :app:assembleDebugAndroidTest
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+adb shell pm grant com.safeway.app android.permission.ACCESS_FINE_LOCATION
+adb shell pm grant com.safeway.app android.permission.ACCESS_COARSE_LOCATION
+adb shell pm grant com.safeway.app android.permission.POST_NOTIFICATIONS
+adb shell appops set com.safeway.app android:mock_location allow
+adb shell am instrument -w com.safeway.app.test/com.safeway.app.NavigationInstrumentation
+adb shell appops set com.safeway.app android:mock_location default
+```
+
+출시 전에는 실제 휴대폰에서 교차로·평행 보도·GPS 음영·화면 잠금·통화 중 음성·장시간 배터리 사용을 별도로 검증해야 합니다. 시뮬레이션 통과만으로 상용 내비게이션 수준의 정확성을 보장하지 않습니다.
 
 ## 동작 흐름
 
@@ -59,7 +92,7 @@ flowchart LR
         RouteSetup["도착지 설정<br/>Kakao Local 검색 또는 지도 선택"]
         AiCall["AI 안심 동행 통화<br/>음성 입력과 TTS 재생"]
         ReturnStart["안심귀가 시작"]
-        LocationService["ReturnLocationService<br/>3초/5m 기준 위치 수집"]
+        LocationService["ReturnLocationService<br/>3초 기준 위치 수집·도보 안내"]
         LocalRecord["실제 이동 경로 기록<br/>SharedPreferences"]
         DeviationCheck{"경로 이탈 또는<br/>위험 신호 감지"}
         Complete["귀가 완료"]
@@ -144,7 +177,7 @@ flowchart LR
 | 영역 | 사용 기술 |
 | --- | --- |
 | Android | Java, Kotlin, Android XML Layout, ViewBinding |
-| 지도/경로 | Kakao Maps SDK v2, Kakao Local API, Kakao Mobility Walking Directions API |
+| 지도/경로 | Kakao Maps SDK v2, Kakao Local API, Kakao Map Walking Route API |
 | 백그라운드 위치 | Android Foreground Service, LocationManager |
 | 보호자 알림 | Firebase Cloud Messaging, firebase-admin |
 | 서버 | Node.js, Express |
@@ -268,4 +301,3 @@ app/build/outputs/apk/debug/app-debug.apk
 - Firebase 서비스 계정 JSON
 - `server/data/*.json`
 - 빌드 산출물, 압축본, 힙 덤프, `node_modules`
-

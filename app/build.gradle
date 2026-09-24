@@ -23,6 +23,7 @@ android {
         targetSdk 35
         versionCode 1
         versionName "1.0"
+        testInstrumentationRunner "com.safeway.app.NavigationInstrumentation"
         buildConfigField "String", "KAKAO_NATIVE_APP_KEY", "\"${kakaoNativeAppKey}\""
         buildConfigField "String", "KAKAO_REST_API_KEY", "\"${kakaoRestApiKey}\""
     }
@@ -41,6 +42,22 @@ android {
         jvmTarget = "17"
     }
 }
+
+// Fast geometry regressions also run as part of the ordinary Gradle check task.
+tasks.register('compileNavigationEngineTests', JavaCompile) {
+    source = files('src/main/java/com/safeway/app/WalkingNavigationEngine.java',
+            'src/testNavigation/java/com/safeway/app/WalkingNavigationEngineTest.java')
+    classpath = files()
+    destinationDirectory = layout.buildDirectory.dir('navigation-tests')
+    sourceCompatibility = '17'
+    targetCompatibility = '17'
+}
+tasks.register('navigationEngineTest', JavaExec) {
+    dependsOn 'compileNavigationEngineTests'
+    classpath = files(layout.buildDirectory.dir('navigation-tests'))
+    mainClass = 'com.safeway.app.WalkingNavigationEngineTest'
+}
+tasks.named('check').configure { dependsOn 'navigationEngineTest' }
 
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'

@@ -311,7 +311,7 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="실시간 도보 내비"
+                android:text="SafeWay 실시간 도보 안내"
                 android:textColor="@color/safeway_ink"
                 android:textSize="15sp"
                 android:textStyle="bold" />
@@ -337,7 +337,7 @@
                     android:id="@+id/walkingNavInstructionText"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="도보 네비를 준비하는 중입니다."
+                    android:text="도보 안내를 준비하는 중입니다."
                     android:textColor="@color/white"
                     android:textSize="16sp"
                     android:textStyle="bold" />
@@ -445,7 +445,7 @@
                     android:gravity="center"
                     android:paddingStart="14dp"
                     android:paddingEnd="14dp"
-                    android:text="현재 위치 추적 중"
+                    android:text="전체화면 도보 안내 열기"
                     android:textColor="@color/white"
                     android:textSize="11sp"
                     android:textStyle="bold" />

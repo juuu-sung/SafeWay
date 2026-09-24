@@ -15,7 +15,7 @@
         android:layout_height="match_parent"
         android:gravity="center"
         android:padding="24dp"
-        android:text="도보 내비를 준비하는 중입니다."
+        android:text="도보 안내를 준비하는 중입니다."
         android:textColor="@color/safeway_muted"
         android:textSize="14sp"
         android:textStyle="bold" />
@@ -41,7 +41,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="도보 내비"
+                android:text="SafeWay 도보 안내"
                 android:textColor="@color/white"
                 android:textSize="13sp"
                 android:textStyle="bold" />
@@ -78,6 +78,38 @@
             android:text="GPS가 켜져 있어야 도보 안내가 갱신됩니다."
             android:textColor="@color/white"
             android:textSize="12sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal">
+            <TextView
+                android:id="@+id/walkingVoiceButton"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_outline"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:text="음성 켜짐"
+                android:textColor="@color/safeway_ink"
+                android:textSize="13sp" />
+            <TextView
+                android:id="@+id/walkingRecalculateButton"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_teal"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:text="경로 다시 찾기"
+                android:textColor="@color/white"
+                android:textSize="13sp" />
+        </LinearLayout>
     </LinearLayout>
 
     <LinearLayout

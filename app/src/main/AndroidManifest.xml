@@ -10,6 +10,9 @@
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
     <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
         <package android:name="net.daum.android.map" />
         <intent>
             <action android:name="android.intent.action.DIAL" />

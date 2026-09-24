@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
@@ -13,8 +14,10 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.view.Gravity;
 import android.view.View;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -67,6 +70,9 @@ public class RouteActivity extends AppCompatActivity {
     private static final float DANGER_MEMO_ROUTE_RADIUS_METERS = 120f;
     private static final float DANGER_MEMO_AVOID_OFFSET_METERS = 260f;
     private static final float WALKING_SPEED_METERS_PER_SECOND = 1.2f;
+    private static final String ROUTE_MODE_BROAD_FIRST = "BROAD_FIRST";
+    private static final String ROUTE_MODE_SHORTEST = "SHORTEST";
+    private static final String ROUTE_MODE_ACCESSIBLE = "ACCESSIBLE";
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -78,6 +84,17 @@ public class RouteActivity extends AppCompatActivity {
     private TextView currentRouteText;
     private TextView pickMapCenterButton;
     private TextView startReturnFromRouteButton;
+    private TextView routeBroadFirstButton;
+    private TextView routeShortestButton;
+    private TextView routeAccessibleButton;
+    private TextView routeModeHelpText;
+    private View routeSummaryMetrics;
+    private TextView routeDistanceValue;
+    private TextView routeDurationValue;
+    private TextView routeModeValue;
+    private View routeGuidanceCard;
+    private TextView routeGuidanceCountText;
+    private LinearLayout routeGuidanceList;
     private View mapCenterTarget;
     private MapView kakaoMapView;
     private KakaoMap kakaoMap;
@@ -96,6 +113,8 @@ public class RouteActivity extends AppCompatActivity {
     private boolean useHomeDestination;
     private boolean requestedHomeMissing;
     private boolean liveLocationUpdatesActive;
+    private volatile long routeRequestId;
+    private volatile String selectedRouteMode = ROUTE_MODE_BROAD_FIRST;
     private LocationListener liveLocationListener;
 
     private static class RouteResponse {
@@ -132,6 +151,17 @@ public class RouteActivity extends AppCompatActivity {
         currentRouteText = findViewById(R.id.currentRouteText);
         pickMapCenterButton = findViewById(R.id.pickMapCenterButton);
         startReturnFromRouteButton = findViewById(R.id.startReturnFromRouteButton);
+        routeBroadFirstButton = findViewById(R.id.routeBroadFirstButton);
+        routeShortestButton = findViewById(R.id.routeShortestButton);
+        routeAccessibleButton = findViewById(R.id.routeAccessibleButton);
+        routeModeHelpText = findViewById(R.id.routeModeHelpText);
+        routeSummaryMetrics = findViewById(R.id.routeSummaryMetrics);
+        routeDistanceValue = findViewById(R.id.routeDistanceValue);
+        routeDurationValue = findViewById(R.id.routeDurationValue);
+        routeModeValue = findViewById(R.id.routeModeValue);
+        routeGuidanceCard = findViewById(R.id.routeGuidanceCard);
+        routeGuidanceCountText = findViewById(R.id.routeGuidanceCountText);
+        routeGuidanceList = findViewById(R.id.routeGuidanceList);
         mapCenterTarget = findViewById(R.id.mapCenterTarget);
         kakaoMapView = findViewById(R.id.routeMap);
         mapCenterTarget.setVisibility(View.GONE);
@@ -139,6 +169,8 @@ public class RouteActivity extends AppCompatActivity {
         useHomeDestination = getIntent().getBooleanExtra(EXTRA_USE_HOME_DESTINATION, false);
 
         destinationInput.setText(prefs.getString(SafeWayPrefs.ROUTE_DESTINATION, ""));
+        selectedRouteMode = normalizeRouteMode(prefs.getString(SafeWayPrefs.ROUTE_MODE, ROUTE_MODE_BROAD_FIRST));
+        updateRouteModeButtons();
         destinationLatLng = getStoredDestinationLatLng();
         routePoints = getStoredRoutePoints();
         if (useHomeDestination && !applyHomeDestination(false)) {
@@ -157,6 +189,9 @@ public class RouteActivity extends AppCompatActivity {
         findViewById(R.id.openExternalMapButton).setOnClickListener(v -> openExternalRouteMap());
         pickMapCenterButton.setOnClickListener(v -> toggleMapSelectionMode());
         findViewById(R.id.loadHomeButton).setOnClickListener(v -> loadHomeDestination());
+        routeBroadFirstButton.setOnClickListener(v -> selectRouteMode(ROUTE_MODE_BROAD_FIRST));
+        routeShortestButton.setOnClickListener(v -> selectRouteMode(ROUTE_MODE_SHORTEST));
+        routeAccessibleButton.setOnClickListener(v -> selectRouteMode(ROUTE_MODE_ACCESSIBLE));
         startReturnFromRouteButton.setOnClickListener(v -> finishRouteSetupAndStart());
     }
 
@@ -284,6 +319,69 @@ public class RouteActivity extends AppCompatActivity {
         return true;
     }
 
+    private void selectRouteMode(String routeMode) {
+        String normalizedMode = normalizeRouteMode(routeMode);
+        if (normalizedMode.equals(selectedRouteMode)) {
+            return;
+        }
+        selectedRouteMode = normalizedMode;
+        routeRequestId++;
+        prefs.edit()
+                .putString(SafeWayPrefs.ROUTE_MODE, selectedRouteMode)
+                .remove(SafeWayPrefs.ROUTE_LAST_LINK)
+                .remove(SafeWayPrefs.ROUTE_LAST_POINTS)
+                .remove(SafeWayPrefs.ROUTE_LAST_GUIDES)
+                .remove(SafeWayPrefs.ROUTE_LAST_DISTANCE_METERS)
+                .putBoolean(SafeWayPrefs.ROUTE_NAVIGABLE, false)
+                .remove(SafeWayPrefs.ROUTE_EXPECTED_MINUTES)
+                .apply();
+        routePoints = null;
+        updateRouteModeButtons();
+        renderMap();
+        updateRouteText();
+        routeStatusText.setText(routeModeLabel(selectedRouteMode) + " 옵션을 선택했습니다. 경로를 다시 계산해주세요.");
+    }
+
+    private String normalizeRouteMode(String routeMode) {
+        if (ROUTE_MODE_SHORTEST.equals(routeMode)) {
+            return ROUTE_MODE_SHORTEST;
+        }
+        if (ROUTE_MODE_ACCESSIBLE.equals(routeMode)) {
+            return ROUTE_MODE_ACCESSIBLE;
+        }
+        return ROUTE_MODE_BROAD_FIRST;
+    }
+
+    private void updateRouteModeButtons() {
+        styleRouteModeButton(routeBroadFirstButton, ROUTE_MODE_BROAD_FIRST.equals(selectedRouteMode));
+        styleRouteModeButton(routeShortestButton, ROUTE_MODE_SHORTEST.equals(selectedRouteMode));
+        styleRouteModeButton(routeAccessibleButton, ROUTE_MODE_ACCESSIBLE.equals(selectedRouteMode));
+        if (ROUTE_MODE_SHORTEST.equals(selectedRouteMode)) {
+            routeModeHelpText.setText("이동 거리가 가장 짧은 도보 경로를 탐색합니다.");
+        } else if (ROUTE_MODE_ACCESSIBLE.equals(selectedRouteMode)) {
+            routeModeHelpText.setText("이동이 편안한 도보 경로를 우선하여 탐색합니다.");
+        } else {
+            routeModeHelpText.setText("안전한 귀가를 위해 넓은 길을 우선하여 탐색합니다.");
+        }
+    }
+
+    private void styleRouteModeButton(TextView button, boolean selected) {
+        button.setSelected(selected);
+        button.setBackgroundResource(selected ? R.drawable.bg_primary : R.drawable.bg_outline);
+        button.setTextColor(getColor(selected ? R.color.white : R.color.safeway_muted));
+        button.setContentDescription(button.getText() + (selected ? ", 선택됨" : ""));
+    }
+
+    private String routeModeLabel(String routeMode) {
+        if (ROUTE_MODE_SHORTEST.equals(routeMode)) {
+            return "최단 길";
+        }
+        if (ROUTE_MODE_ACCESSIBLE.equals(routeMode)) {
+            return "편안한 길";
+        }
+        return "큰길 우선";
+    }
+
     private void calculateRouteInApp() {
         String destination = destinationInput.getText().toString().trim();
         if (destination.isEmpty()) {
@@ -326,31 +424,51 @@ public class RouteActivity extends AppCompatActivity {
             return;
         }
 
-        routeStatusText.setText("현재 위치에서 도착지까지 카카오 경로를 계산하는 중입니다.");
+        routeStatusText.setText("현재 위치에서 도착지까지 " + routeModeLabel(selectedRouteMode) + " 도보 경로를 계산하는 중입니다.");
         renderMap();
         requestRouteFromServer(serverUrl, currentLatLng, destinationLatLng, location, destination);
     }
 
     private void requestRouteFromServer(String serverUrl, LatLng origin, LatLng destination, Location location, String destinationText) {
+        final String requestedRouteMode = selectedRouteMode;
+        final long requestedId = ++routeRequestId;
         executor.execute(() -> {
             try {
-                RouteResponse selectedRoute = fetchRouteFromServer(serverUrl, origin, destination, null);
+                RouteResponse selectedRoute = fetchRouteFromServer(serverUrl, origin, destination, null, requestedRouteMode);
+                if (requestedId != routeRequestId || !requestedRouteMode.equals(selectedRouteMode)) {
+                    return;
+                }
                 if (selectedRoute.points.size() < 2) {
-                    mainHandler.post(() -> showLocalFallbackRoute(
-                            origin,
-                            destination,
-                            location,
-                            destinationText,
-                            "경로선 응답이 없어 직선 참고선을 표시했습니다."
-                    ));
+                    mainHandler.post(() -> {
+                        if (requestedId == routeRequestId && requestedRouteMode.equals(selectedRouteMode)) {
+                            showLocalFallbackRoute(
+                                    origin,
+                                    destination,
+                                    location,
+                                    destinationText,
+                                    "경로선 응답이 없어 직선 참고선을 표시했습니다."
+                            );
+                        }
+                    });
                     return;
                 }
 
                 boolean avoidanceApplied = false;
                 List<AppDatabase.DangerMemo> dangerMemos = findDangerMemosNearRoute(selectedRoute.points);
                 if (!selectedRoute.fallback && !dangerMemos.isEmpty()) {
-                    mainHandler.post(() -> routeStatusText.setText("위험 메모를 피해 경로를 다시 계산하는 중입니다."));
-                    RouteResponse avoidedRoute = findAvoidanceRoute(serverUrl, origin, destination, selectedRoute, dangerMemos);
+                    mainHandler.post(() -> {
+                        if (requestedId == routeRequestId && requestedRouteMode.equals(selectedRouteMode)) {
+                            routeStatusText.setText("위험 메모를 피해 경로를 다시 계산하는 중입니다.");
+                        }
+                    });
+                    RouteResponse avoidedRoute = findAvoidanceRoute(
+                            serverUrl,
+                            origin,
+                            destination,
+                            selectedRoute,
+                            dangerMemos,
+                            requestedRouteMode
+                    );
                     if (avoidedRoute != null) {
                         selectedRoute = avoidedRoute;
                         avoidanceApplied = true;
@@ -361,6 +479,9 @@ public class RouteActivity extends AppCompatActivity {
                 final boolean avoided = avoidanceApplied;
                 final List<AppDatabase.DangerMemo> remainingDangerMemos = findDangerMemosNearRoute(route.points);
                 mainHandler.post(() -> {
+                    if (requestedId != routeRequestId || !requestedRouteMode.equals(selectedRouteMode)) {
+                        return;
+                    }
                     routePoints = route.points;
                     String routeLink = PushAlertClient.buildDirectionsLink(location, formatLatLng(destination));
                     int expectedMinutes = parseDurationMinutes(route.duration);
@@ -368,10 +489,19 @@ public class RouteActivity extends AppCompatActivity {
                             .putString(SafeWayPrefs.ROUTE_LAST_LINK, routeLink)
                             .putString(SafeWayPrefs.ROUTE_LAST_POINTS, serializeRoutePoints(route.points))
                             .putString(SafeWayPrefs.ROUTE_LAST_GUIDES, route.guides == null ? "" : route.guides.toString())
+                            .putInt(SafeWayPrefs.ROUTE_LAST_DISTANCE_METERS, route.distanceMeters)
+                            .putBoolean(SafeWayPrefs.ROUTE_NAVIGABLE, !route.fallback)
                             .putInt(SafeWayPrefs.ROUTE_EXPECTED_MINUTES, expectedMinutes)
                             .apply();
                     renderMap();
-                    updateRouteResultText(destinationText, route.distanceMeters, route.duration, route.fallback, route.routeMode);
+                    updateRouteResultText(
+                            destinationText,
+                            route.distanceMeters,
+                            route.duration,
+                            route.fallback,
+                            route.routeMode,
+                            route.guides
+                    );
                     if (avoided) {
                         routeStatusText.setText(remainingDangerMemos.isEmpty()
                                 ? "위험 메모를 피해 경로를 계산했습니다."
@@ -389,23 +519,34 @@ public class RouteActivity extends AppCompatActivity {
                     ).show();
                 });
             } catch (Exception e) {
-                mainHandler.post(() -> showLocalFallbackRoute(
-                        origin,
-                        destination,
-                        location,
-                        destinationText,
-                        "서버 연결이 안 되어 직선 참고선을 표시했습니다."
-                ));
+                mainHandler.post(() -> {
+                    if (requestedId == routeRequestId && requestedRouteMode.equals(selectedRouteMode)) {
+                        showLocalFallbackRoute(
+                                origin,
+                                destination,
+                                location,
+                                destinationText,
+                                "서버 연결이 안 되어 직선 참고선을 표시했습니다."
+                        );
+                    }
+                });
             }
         });
     }
 
-    private RouteResponse fetchRouteFromServer(String serverUrl, LatLng origin, LatLng destination, List<LatLng> waypoints) throws Exception {
+    private RouteResponse fetchRouteFromServer(
+            String serverUrl,
+            LatLng origin,
+            LatLng destination,
+            List<LatLng> waypoints,
+            String routeMode
+    ) throws Exception {
         HttpURLConnection connection = null;
         try {
             JSONObject payload = new JSONObject();
             payload.put("origin", toLatLngJson(origin));
             payload.put("destination", toLatLngJson(destination));
+            payload.put("routeMode", normalizeRouteMode(routeMode));
             if (waypoints != null && !waypoints.isEmpty()) {
                 JSONArray waypointArray = new JSONArray();
                 for (LatLng waypoint : waypoints) {
@@ -431,21 +572,16 @@ public class RouteActivity extends AppCompatActivity {
             String response = readResponse(connection, status);
             JSONObject json = new JSONObject(response);
             if (status < 200 || status >= 300 || !json.optBoolean("ok", false)) {
-                throw new IllegalStateException(json.optString("error", "Kakao Mobility API 응답 오류") + " (" + status + ")");
+                throw new IllegalStateException(json.optString("error", "Kakao Map 도보 경로 API 응답 오류") + " (" + status + ")");
             }
 
             List<LatLng> decodedPoints = decodePolyline(json.optString("encodedPolyline", ""));
             int distanceMeters = json.optInt("distanceMeters", 0);
             String duration = json.optString("duration", "");
             boolean fallback = json.optBoolean("fallback", false);
-            String routeMode = json.optString("routeMode", "");
+            String responseRouteMode = json.optString("routeMode", "");
             JSONArray guides = json.optJSONArray("guides");
-            if ("driving".equals(routeMode)) {
-                duration = estimateWalkingDuration(distanceMeters);
-                routeMode = "walking_estimate";
-                guides = null;
-            }
-            return new RouteResponse(decodedPoints, distanceMeters, duration, fallback, routeMode, guides);
+            return new RouteResponse(decodedPoints, distanceMeters, duration, fallback, responseRouteMode, guides);
         } finally {
             if (connection != null) {
                 connection.disconnect();
@@ -458,7 +594,8 @@ public class RouteActivity extends AppCompatActivity {
             LatLng origin,
             LatLng destination,
             RouteResponse originalRoute,
-            List<AppDatabase.DangerMemo> dangerMemos
+            List<AppDatabase.DangerMemo> dangerMemos,
+            String routeMode
     ) {
         List<List<LatLng>> candidates = buildAvoidanceWaypointCandidates(origin, destination, dangerMemos);
         if (candidates.isEmpty()) {
@@ -470,8 +607,14 @@ public class RouteActivity extends AppCompatActivity {
         int bestDangerCount = originalDangerCount;
         int bestDistance = originalRoute.distanceMeters;
         for (List<LatLng> candidate : candidates) {
+            if (!routeMode.equals(selectedRouteMode)) {
+                return null;
+            }
             try {
-                RouteResponse candidateRoute = fetchRouteFromServer(serverUrl, origin, destination, candidate);
+                RouteResponse candidateRoute = fetchRouteFromServer(serverUrl, origin, destination, candidate, routeMode);
+                if (!routeMode.equals(selectedRouteMode)) {
+                    return null;
+                }
                 if (candidateRoute == null || candidateRoute.points.size() < 2 || candidateRoute.fallback) {
                     continue;
                 }
@@ -559,11 +702,13 @@ public class RouteActivity extends AppCompatActivity {
                 .putString(SafeWayPrefs.ROUTE_LAST_LINK, routeLink)
                 .putString(SafeWayPrefs.ROUTE_LAST_POINTS, serializeRoutePoints(fallbackPoints))
                 .remove(SafeWayPrefs.ROUTE_LAST_GUIDES)
+                .remove(SafeWayPrefs.ROUTE_LAST_DISTANCE_METERS)
+                .putBoolean(SafeWayPrefs.ROUTE_NAVIGABLE, false)
                 .putInt(SafeWayPrefs.ROUTE_EXPECTED_MINUTES, expectedMinutes)
                 .apply();
 
         renderMap();
-        updateRouteResultText(destinationText, distanceMeters, duration, true, "line");
+        updateRouteResultText(destinationText, distanceMeters, duration, true, "line", null);
         applyDangerMemoWarningForRoute(fallbackPoints);
         Toast.makeText(this, toastMessage, Toast.LENGTH_LONG).show();
     }
@@ -682,6 +827,10 @@ public class RouteActivity extends AppCompatActivity {
     }
 
     private void finishRouteSetupAndStart() {
+        if (!prefs.getBoolean(SafeWayPrefs.ROUTE_NAVIGABLE, false)) {
+            Toast.makeText(this, "실제 도보 경로를 먼저 계산해주세요. 직선 참고선은 길안내에 사용할 수 없습니다.", Toast.LENGTH_LONG).show();
+            return;
+        }
         if (prefs.getBoolean(SafeWayPrefs.RETURNING, false)) {
             Toast.makeText(this, "이미 귀가가 진행 중입니다.", Toast.LENGTH_SHORT).show();
             finish();
@@ -945,9 +1094,10 @@ public class RouteActivity extends AppCompatActivity {
         boolean returning = prefs.getBoolean(SafeWayPrefs.RETURNING, false);
         String destination = prefs.getString(SafeWayPrefs.ROUTE_DESTINATION, "");
         String routeLink = prefs.getString(SafeWayPrefs.ROUTE_LAST_LINK, "");
+        hideRouteDetails();
 
         routeStatusText.setText(returning
-                ? "귀가 진행 중입니다. 이 화면에서 현재 위치를 실시간으로 갱신합니다."
+                ? "귀가 진행 중입니다. 메인 화면에서 SafeWay 도보 안내를 열 수 있습니다."
                 : (startFlow
                 ? "안심귀가를 시작하기 전에 도착지와 경로를 먼저 설정하세요."
                 : "현재 위치를 기준으로 집까지 경로를 설정합니다."));
@@ -971,28 +1121,188 @@ public class RouteActivity extends AppCompatActivity {
             return;
         }
         currentRouteText.setText("도착지: " + destination + "\n보호자에게 공유할 경로 링크와 앱 안 경로가 준비되었습니다.");
+        int distanceMeters = prefs.getInt(SafeWayPrefs.ROUTE_LAST_DISTANCE_METERS, 0);
+        int expectedMinutes = prefs.getInt(SafeWayPrefs.ROUTE_EXPECTED_MINUTES, 0);
+        if (routePoints != null && routePoints.size() >= 2 && distanceMeters > 0 && expectedMinutes > 0) {
+            showRouteSummaryMetrics(
+                    distanceMeters,
+                    expectedMinutes + "분",
+                    routeModeLabel(selectedRouteMode)
+            );
+            renderWalkingGuides(getStoredRouteGuides());
+        }
     }
 
-    private void updateRouteResultText(String destination, int distanceMeters, String duration, boolean fallback, String routeMode) {
-        String distanceText = distanceMeters > 0
-                ? String.format(Locale.KOREA, "%.1fkm", distanceMeters / 1000f)
-                : "거리 정보 없음";
+    private void updateRouteResultText(
+            String destination,
+            int distanceMeters,
+            String duration,
+            boolean fallback,
+            String routeMode,
+            JSONArray guides
+    ) {
         String durationText = formatDuration(duration);
-        boolean walkingEstimate = "walking_estimate".equals(routeMode);
         routeStatusText.setText(fallback
                 ? "직선 참고선으로 경로를 표시했습니다."
-                : walkingEstimate
-                ? "도보 기준 예상 시간을 계산했습니다."
-                : "귀가 경로 계산이 완료되었습니다.");
-        String routeTypeText = fallback
-                ? "\n실제 길찾기 경로를 찾지 못해 현재 위치와 도착지를 직선 참고선으로 연결했습니다."
-                : walkingEstimate
-                ? "\n예상 시간은 도보 기준으로 계산했습니다."
-                : "\n보호자에게 공유할 경로 링크와 앱 안 경로가 준비되었습니다.";
-        currentRouteText.setText("도착지: " + destination
-                + "\n예상 거리: " + distanceText
-                + "\n예상 시간: " + durationText + " · 도보 기준"
-                + routeTypeText);
+                : routeModeLabel(routeMode) + " 도보 경로 계산이 완료되었습니다.");
+        currentRouteText.setText(fallback
+                ? "도착지: " + destination
+                + "\n실제 길찾기 경로를 찾지 못해 현재 위치와 도착지를 직선 참고선으로 연결했습니다."
+                : "도착지: " + destination
+                + "\n카카오 보행 경로와 단계별 안내가 준비되었습니다.");
+        showRouteSummaryMetrics(
+                distanceMeters,
+                durationText,
+                fallback ? "직선 참고" : routeModeLabel(routeMode)
+        );
+        renderWalkingGuides(fallback ? null : guides);
+    }
+
+    private void hideRouteDetails() {
+        routeSummaryMetrics.setVisibility(View.GONE);
+        routeDistanceValue.setText("-");
+        routeDurationValue.setText("-");
+        routeModeValue.setText("-");
+        routeGuidanceCard.setVisibility(View.GONE);
+        routeGuidanceCountText.setText("0개 구간");
+        routeGuidanceList.removeAllViews();
+    }
+
+    private void showRouteSummaryMetrics(int distanceMeters, String durationText, String modeText) {
+        routeDistanceValue.setText(distanceMeters > 0 ? formatDistanceMeters(distanceMeters) : "-");
+        routeDurationValue.setText(durationText == null || durationText.trim().isEmpty() ? "-" : durationText);
+        routeModeValue.setText(modeText == null || modeText.trim().isEmpty() ? "-" : modeText);
+        routeSummaryMetrics.setVisibility(View.VISIBLE);
+    }
+
+    private JSONArray getStoredRouteGuides() {
+        String storedGuides = prefs.getString(SafeWayPrefs.ROUTE_LAST_GUIDES, "");
+        if (storedGuides == null || storedGuides.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return new JSONArray(storedGuides);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private void renderWalkingGuides(JSONArray guides) {
+        routeGuidanceList.removeAllViews();
+        if (guides == null || guides.length() == 0) {
+            routeGuidanceCard.setVisibility(View.GONE);
+            routeGuidanceCountText.setText("0개 구간");
+            return;
+        }
+
+        List<JSONObject> validGuides = new ArrayList<>();
+        for (int index = 0; index < guides.length(); index++) {
+            JSONObject guide = guides.optJSONObject(index);
+            if (guide != null && !guide.optString("text", "").trim().isEmpty()) {
+                validGuides.add(guide);
+            }
+        }
+        if (validGuides.isEmpty()) {
+            routeGuidanceCard.setVisibility(View.GONE);
+            routeGuidanceCountText.setText("0개 구간");
+            return;
+        }
+
+        routeGuidanceCountText.setText(validGuides.size() + "개 구간");
+        routeGuidanceCard.setVisibility(View.VISIBLE);
+        for (int index = 0; index < validGuides.size(); index++) {
+            addWalkingGuideRow(index + 1, validGuides.get(index), index < validGuides.size() - 1);
+        }
+    }
+
+    private void addWalkingGuideRow(int number, JSONObject guide, boolean showDivider) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.TOP);
+        row.setPadding(0, dpToPx(11), 0, dpToPx(11));
+
+        TextView numberView = new TextView(this);
+        numberView.setBackgroundResource(R.drawable.bg_primary_soft);
+        numberView.setGravity(Gravity.CENTER);
+        numberView.setText(String.valueOf(number));
+        numberView.setTextColor(ContextCompat.getColor(this, R.color.safeway_primary));
+        numberView.setTextSize(12);
+        numberView.setTypeface(numberView.getTypeface(), Typeface.BOLD);
+        LinearLayout.LayoutParams numberParams = new LinearLayout.LayoutParams(dpToPx(32), dpToPx(32));
+        numberParams.setMarginEnd(dpToPx(12));
+        row.addView(numberView, numberParams);
+
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+
+        TextView instruction = new TextView(this);
+        instruction.setText(guide.optString("text", "").trim());
+        instruction.setTextColor(ContextCompat.getColor(this, R.color.safeway_ink));
+        instruction.setTextSize(13);
+        instruction.setTypeface(instruction.getTypeface(), Typeface.BOLD);
+        content.addView(instruction, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        ));
+
+        String meta = formatGuideMeta(
+                guide.optInt("distanceMeters", 0),
+                guide.optInt("durationSeconds", 0)
+        );
+        if (!meta.isEmpty()) {
+            TextView metaView = new TextView(this);
+            metaView.setText(meta);
+            metaView.setTextColor(ContextCompat.getColor(this, R.color.safeway_muted));
+            metaView.setTextSize(11);
+            LinearLayout.LayoutParams metaParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+            );
+            metaParams.topMargin = dpToPx(4);
+            content.addView(metaView, metaParams);
+        }
+
+        row.addView(content, new LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                1f
+        ));
+        routeGuidanceList.addView(row);
+
+        if (showDivider) {
+            View divider = new View(this);
+            divider.setBackgroundColor(ContextCompat.getColor(this, R.color.safeway_border));
+            routeGuidanceList.addView(divider, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dpToPx(1)
+            ));
+        }
+    }
+
+    private String formatGuideMeta(int distanceMeters, int durationSeconds) {
+        String distanceText = "";
+        String durationText = "";
+        if (distanceMeters > 0) {
+            distanceText = formatDistanceMeters(distanceMeters);
+        }
+        if (durationSeconds > 0) {
+            int minutes = Math.max(1, (int) Math.round(durationSeconds / 60.0));
+            durationText = "약 " + minutes + "분";
+        }
+        if (distanceText.isEmpty()) {
+            return durationText;
+        }
+        if (durationText.isEmpty()) {
+            return distanceText;
+        }
+        return distanceText + " · " + durationText;
+    }
+
+    private String formatDistanceMeters(int distanceMeters) {
+        if (distanceMeters >= 1000) {
+            return String.format(Locale.KOREA, "%.1fkm", distanceMeters / 1000f);
+        }
+        return Math.max(0, distanceMeters) + "m";
     }
 
     private void applyDangerMemoWarningForRoute(List<LatLng> points) {
@@ -1254,6 +1564,7 @@ public class RouteActivity extends AppCompatActivity {
     }
 
     private void applyDestination(LatLng latLng, String label, boolean moveCamera, boolean showToast) {
+        routeRequestId++;
         String destinationLabel = label == null ? "" : label.trim();
         if (destinationLabel.isEmpty()) {
             destinationLabel = formatLatLng(latLng);
@@ -1270,6 +1581,8 @@ public class RouteActivity extends AppCompatActivity {
                 .remove(SafeWayPrefs.ROUTE_LAST_LINK)
                 .remove(SafeWayPrefs.ROUTE_LAST_POINTS)
                 .remove(SafeWayPrefs.ROUTE_LAST_GUIDES)
+                .remove(SafeWayPrefs.ROUTE_LAST_DISTANCE_METERS)
+                .putBoolean(SafeWayPrefs.ROUTE_NAVIGABLE, false)
                 .remove(SafeWayPrefs.ROUTE_EXPECTED_MINUTES)
                 .apply();
         renderMap();

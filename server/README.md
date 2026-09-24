@@ -15,8 +15,8 @@ cp .env.example .env
 
 `GOOGLE_APPLICATION_CREDENTIALS`에 서비스 계정 JSON의 절대 경로를 넣습니다.
 앱 안 지도 경로 계산까지 쓰려면 Kakao Developers REST API 키를 `KAKAO_REST_API_KEY`에 넣습니다.
-서버는 도보 길찾기를 먼저 시도하고 권한이 없으면 공개 문서에 있는 Kakao Mobility 자동차 길찾기 경로로 표시합니다.
-도보 경로를 앱 안에 실제 경로선으로 표시하려면 Kakao Mobility 도보 길찾기 API 권한이 필요합니다.
+Kakao Developers의 [앱] > [제품 설정] > [카카오맵]에서 [사용 설정]을 켜야 합니다.
+서버는 카카오맵 도보 경로 API로 큰길 우선, 최단 길, 편안한 길을 계산하며 위험 메모 우회 경우 최대 5개 경유지를 한 번에 전달합니다.
 AI 안심 동행 통화의 실제 GPT 응답과 요약을 쓰려면 `OPENAI_API_KEY`에 OpenAI API 키를 넣습니다.
 모델은 기본값으로 `gpt-5.2`를 쓰며, 필요하면 `OPENAI_MODEL` 값을 바꿉니다.
 AI 통화 음성은 서버에서 OpenAI TTS로 생성합니다. 기본 TTS 모델은 `gpt-4o-mini-tts`, 기본 voice는 `marin`입니다.
@@ -92,9 +92,15 @@ Content-Type: application/json
 ```json
 {
   "origin": { "latitude": 37.5665, "longitude": 126.978 },
-  "destination": { "latitude": 37.5701, "longitude": 126.982 }
+  "destination": { "latitude": 37.5701, "longitude": 126.982 },
+  "routeMode": "BROAD_FIRST",
+  "waypoints": [
+    { "latitude": 37.568, "longitude": 126.98 }
+  ]
 }
 ```
+
+`routeMode`은 `BROAD_FIRST`(큰길 우선), `SHORTEST`(최단 길), `ACCESSIBLE`(편안한 길) 중 하나입니다. 생략하면 `BROAD_FIRST`를 사용합니다.
 
 응답:
 

@@ -22,11 +22,15 @@ import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
 public class ReturnLocationService extends Service {
+    static final String ACTION_RECALCULATE = "com.safeway.app.RECALCULATE_WALK";
+    static final String ACTION_MUTE = "com.safeway.app.MUTE_WALK";
     private static final int NOTIFICATION_ID = 1001;
     private static final String CHANNEL_ID = "safeway_return";
 
     private LocationManager locationManager;
     private LocationListener locationListener;
+    private WalkingNavigator navigator;
+    private String navigationText = "현재 위치를 확인하고 있습니다.";
 
     @Override
     public void onCreate() {
@@ -36,8 +40,23 @@ public class ReturnLocationService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        if (!SafeWayPrefs.get(this).getBoolean(SafeWayPrefs.RETURNING, false) || !hasLocationPermission()) {
+            stopSelf();
+            return START_NOT_STICKY;
+        }
         startForeground(NOTIFICATION_ID, buildNotification());
-        startLocationUpdates();
+        if (navigator == null) navigator = new WalkingNavigator(this, (instruction, detail) -> {
+            navigationText = instruction + " · " + detail;
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            if (manager != null) manager.notify(NOTIFICATION_ID, buildNotification());
+        });
+        if (intent != null && ACTION_MUTE.equals(intent.getAction())) {
+            SharedPreferences prefs = SafeWayPrefs.get(this);
+            prefs.edit().putBoolean(SafeWayPrefs.NAV_VOICE, !prefs.getBoolean(SafeWayPrefs.NAV_VOICE, true)).apply();
+            getSystemService(NotificationManager.class).notify(NOTIFICATION_ID, buildNotification());
+        }
+        if (locationListener == null) startLocationUpdates();
+        if (intent != null && ACTION_RECALCULATE.equals(intent.getAction())) navigator.reroute();
         return START_STICKY;
     }
 
@@ -54,11 +73,6 @@ public class ReturnLocationService extends Service {
             return;
         }
 
-        String provider = getLocationProvider();
-        if (provider == null) {
-            return;
-        }
-
         stopLocationUpdates();
         locationListener = new LocationListener() {
             @Override
@@ -67,8 +81,10 @@ public class ReturnLocationService extends Service {
                     stopSelf();
                     return;
                 }
-                ReturnTrackRecorder.record(ReturnLocationService.this, location);
-                PushAlertClient.sendReturnLocationUpdate(ReturnLocationService.this, location, null);
+                if (navigator != null && navigator.location(location)) {
+                    ReturnTrackRecorder.record(ReturnLocationService.this, location);
+                    PushAlertClient.sendReturnLocationUpdate(ReturnLocationService.this, location, null);
+                }
             }
 
             @Override
@@ -86,9 +102,12 @@ public class ReturnLocationService extends Service {
 
         try {
             Location lastLocation = getBestLastKnownLocation();
-            ReturnTrackRecorder.record(this, lastLocation);
-            PushAlertClient.sendReturnLocationUpdate(this, lastLocation, null);
-            locationManager.requestLocationUpdates(provider, 3000L, 5f, locationListener, Looper.getMainLooper());
+            if (lastLocation != null) locationListener.onLocationChanged(lastLocation);
+            // Register both providers, including disabled GPS, so enabling GPS resumes the session.
+            for (String provider : new String[]{LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER}) {
+                if (locationManager.getAllProviders().contains(provider))
+                    locationManager.requestLocationUpdates(provider, 3000L, 0f, locationListener, Looper.getMainLooper());
+            }
         } catch (SecurityException ignored) {
             stopSelf();
         }
@@ -109,13 +128,15 @@ public class ReturnLocationService extends Service {
 
     private Notification buildNotification() {
         ensureNotificationChannel();
-        Intent intent = new Intent(this, MainActivity.class);
+        Intent intent = new Intent(this, WalkingNaviActivity.class);
         int pendingIntentFlags = PendingIntent.FLAG_UPDATE_CURRENT;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             pendingIntentFlags |= PendingIntent.FLAG_IMMUTABLE;
         }
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, pendingIntentFlags);
-        String body = "귀가 기록에 실제 이동 경로를 저장하고 있습니다.";
+        String body = navigationText;
+        PendingIntent mute = PendingIntent.getService(this, 1,
+                new Intent(this, ReturnLocationService.class).setAction(ACTION_MUTE), pendingIntentFlags);
         Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
                 ? new Notification.Builder(this, CHANNEL_ID)
                 : new Notification.Builder(this);
@@ -128,6 +149,10 @@ public class ReturnLocationService extends Service {
                 .setOngoing(true)
                 .setAutoCancel(false)
                 .setOnlyAlertOnce(true)
+                .setVisibility(Notification.VISIBILITY_PRIVATE)
+                .addAction(new Notification.Action.Builder(null,
+                        SafeWayPrefs.get(this).getBoolean(SafeWayPrefs.NAV_VOICE, true) ? "음성 끄기" : "음성 켜기",
+                        mute).build())
                 .setPriority(Notification.PRIORITY_HIGH)
                 .setCategory(Notification.CATEGORY_STATUS)
                 .build();
@@ -198,6 +223,8 @@ public class ReturnLocationService extends Service {
     @Override
     public void onDestroy() {
         stopLocationUpdates();
+        if (navigator != null) navigator.close();
+        stopForeground(STOP_FOREGROUND_REMOVE);
         super.onDestroy();
     }
 }

@@ -264,7 +264,7 @@ function buildFallbackRoute(originLatitude, originLongitude, destinationLatitude
     duration: `${durationSeconds}s`,
     fallback: true,
     routeMode: "line",
-    fallbackReason: reason || "Kakao Mobility API did not return a walking route",
+    fallbackReason: reason || "Kakao Map API did not return a walking route",
   };
 }
 
@@ -342,106 +342,12 @@ function getJson(url, headers) {
   });
 }
 
-function extractKakaoRoutePoints(route) {
-  const points = [];
-  const sections = Array.isArray(route.sections) ? route.sections : [];
-  for (const section of sections) {
-    const roads = Array.isArray(section.roads) ? section.roads : [];
-    for (const road of roads) {
-      const vertexes = Array.isArray(road.vertexes) ? road.vertexes : [];
-      for (let index = 0; index + 1 < vertexes.length; index += 2) {
-        const longitude = optionalNumber(vertexes[index]);
-        const latitude = optionalNumber(vertexes[index + 1]);
-        if (latitude === null || longitude === null) {
-          continue;
-        }
-        const previous = points[points.length - 1];
-        if (previous && previous.latitude === latitude && previous.longitude === longitude) {
-          continue;
-        }
-        points.push({ latitude, longitude });
-      }
-    }
-  }
-  return points;
-}
-
-function extractKakaoRouteGuides(route) {
-  const guides = [];
-  const sections = Array.isArray(route.sections) ? route.sections : [];
-  for (const section of sections) {
-    const sectionGuides = Array.isArray(section.guides) ? section.guides : [];
-    for (const guide of sectionGuides) {
-      const longitude =
-        optionalNumber(guide.x) ??
-        optionalNumber(guide.longitude) ??
-        optionalNumber(guide.lng);
-      const latitude =
-        optionalNumber(guide.y) ??
-        optionalNumber(guide.latitude) ??
-        optionalNumber(guide.lat);
-      const text =
-        optionalString(guide.guidance) ||
-        optionalString(guide.description) ||
-        optionalString(guide.name);
-      if (latitude === null || longitude === null || !text) {
-        continue;
-      }
-      guides.push({
-        latitude,
-        longitude,
-        text,
-        distanceMeters: optionalNumber(guide.distance) || 0,
-        durationSeconds: optionalNumber(guide.duration) || 0,
-      });
-    }
-  }
-  return guides;
-}
-
-function buildKakaoRoute(route, source, routeMode) {
-  const points = extractKakaoRoutePoints(route);
-  if (points.length < 2) {
-    return null;
-  }
-
-  const summary = route.summary || {};
-  return {
-    ok: true,
-    encodedPolyline: encodePolyline(points),
-    distanceMeters: optionalNumber(summary.distance) || optionalNumber(route.distance) || 0,
-    duration: `${optionalNumber(summary.duration) || optionalNumber(route.duration) || 0}s`,
-    fallback: false,
-    source,
-    routeMode,
-    points,
-    guides: extractKakaoRouteGuides(route),
-  };
-}
-
-function toWalkingDuration(distanceMeters) {
-  return `${Math.max(60, Math.round((optionalNumber(distanceMeters) || 0) / 1.2))}s`;
-}
-
-function withWalkingTimeEstimate(route, source = "kakao_driving_geometry_walking_time") {
-  if (!route) {
-    return null;
-  }
-  return {
-    ...route,
-    duration: toWalkingDuration(route.distanceMeters),
-    source,
-    routeMode: "walking_estimate",
-    guides: [],
-  };
-}
-
 function parseWaypoints(value) {
   if (!Array.isArray(value)) {
     return [];
   }
   return value
-    .slice(0, 3)
+    .slice(0, 5)
     .map((point) => ({
       latitude: optionalNumber(point && point.latitude),
       longitude: optionalNumber(point && point.longitude),
@@ -449,204 +355,150 @@ function parseWaypoints(value) {
     .filter((point) => point.latitude !== null && point.longitude !== null);
 }
 
-function durationSecondsFromRoute(route) {
-  const value = optionalString(route && route.duration);
-  if (!value.endsWith("s")) {
-    return 0;
-  }
-  const seconds = Number.parseInt(value.substring(0, value.length - 1), 10);
-  return Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
+const KAKAO_WALK_ROUTE_MODES = new Set(["BROAD_FIRST", "SHORTEST", "ACCESSIBLE"]);
+
+function parseRouteMode(value) {
+  const mode = optionalString(value).toUpperCase();
+  return KAKAO_WALK_ROUTE_MODES.has(mode) ? mode : "BROAD_FIRST";
 }
 
-function mergeRouteSegments(segments, routeMode) {
-  const points = [];
-  const guides = [];
-  let distanceMeters = 0;
-  let durationSeconds = 0;
-  let fallback = false;
-  for (const segment of segments) {
-    const segmentPoints = Array.isArray(segment.points) ? segment.points : [];
-    for (const point of segmentPoints) {
-      const previous = points[points.length - 1];
-      if (previous && previous.latitude === point.latitude && previous.longitude === point.longitude) {
-        continue;
-      }
-      points.push(point);
-    }
-    distanceMeters += optionalNumber(segment.distanceMeters) || 0;
-    durationSeconds += durationSecondsFromRoute(segment);
-    fallback = fallback || Boolean(segment.fallback);
-    if (Array.isArray(segment.guides)) {
-      guides.push(...segment.guides);
+function appendUniquePoint(points, longitudeValue, latitudeValue) {
+  const longitude = optionalNumber(longitudeValue);
+  const latitude = optionalNumber(latitudeValue);
+  if (latitude === null || longitude === null) {
+    return;
+  }
+  const previous = points[points.length - 1];
+  if (previous && previous.latitude === latitude && previous.longitude === longitude) {
+    return;
+  }
+  points.push({ latitude, longitude });
+}
+
+function kakaoMapWalkSteps(route) {
+  const steps = [];
+  const legs = Array.isArray(route && route.legs) ? route.legs : [];
+  for (const leg of legs) {
+    if (Array.isArray(leg && leg.steps)) {
+      steps.push(...leg.steps);
     }
   }
+  return steps;
+}
+
+function extractKakaoMapWalkPoints(route) {
+  const points = [];
+  for (const step of kakaoMapWalkSteps(route)) {
+    const path = step && step.path ? step.path : {};
+    const pathPoints = Array.isArray(path.points) ? path.points : [];
+    for (const point of pathPoints) {
+      if (Array.isArray(point) && point.length >= 2) {
+        appendUniquePoint(points, point[0], point[1]);
+      }
+    }
+  }
+  return points;
+}
+
+function extractKakaoMapWalkGuides(route) {
+  const guides = [];
+  for (const step of kakaoMapWalkSteps(route)) {
+    const properties = step && step.properties ? step.properties : {};
+    const text = optionalString(properties.guidance);
+    if (!text) {
+      continue;
+    }
+
+    const path = step && step.path ? step.path : {};
+    const firstPoint = Array.isArray(path.points) && Array.isArray(path.points[0])
+      ? path.points[0]
+      : [];
+    const longitude = optionalNumber(properties.x) ?? optionalNumber(firstPoint[0]);
+    const latitude = optionalNumber(properties.y) ?? optionalNumber(firstPoint[1]);
+    if (latitude === null || longitude === null) {
+      continue;
+    }
+
+    guides.push({
+      latitude,
+      longitude,
+      text,
+      distanceMeters: optionalNumber(properties.distance) || 0,
+      durationSeconds: optionalNumber(properties.time) || 0,
+    });
+  }
+  return guides;
+}
+
+function buildKakaoMapWalkingRoute(route, routeMode, waypointCount) {
+  const points = extractKakaoMapWalkPoints(route);
   if (points.length < 2) {
     return null;
   }
+  const properties = route && route.properties ? route.properties : {};
   return {
     ok: true,
     encodedPolyline: encodePolyline(points),
-    points,
-    distanceMeters,
-    duration: `${Math.max(60, durationSeconds || Math.round(distanceMeters / 1.2))}s`,
-    fallback,
-    source: "safeway_waypoint_avoidance",
+    distanceMeters: optionalNumber(properties.totalDistance) || 0,
+    duration: `${optionalNumber(properties.totalTime) || 0}s`,
+    fallback: false,
+    source: "kakao_map_walking",
     routeMode,
-    guides,
-    avoidance: true,
+    waypointCount,
+    landingUrl: optionalString(properties.landingUrl),
+    points,
+    guides: extractKakaoMapWalkGuides(route),
   };
 }
 
-async function computeRouteSegment(apiKey, origin, destination) {
-  const walkingResult = await computeRouteWithKakaoWalkingApi(
-    apiKey,
-    origin.latitude,
-    origin.longitude,
-    destination.latitude,
-    destination.longitude
-  );
-  if (walkingResult.route) {
-    return { route: walkingResult.route, reason: "", routeMode: "walking" };
-  }
-
-  const drivingResult = await computeRouteWithKakaoDrivingApi(
-    apiKey,
-    origin.latitude,
-    origin.longitude,
-    destination.latitude,
-    destination.longitude
-  );
-  if (drivingResult.route) {
-    return {
-      route: withWalkingTimeEstimate(drivingResult.route),
-      reason: walkingResult.reason,
-      routeMode: "walking_estimate",
-    };
-  }
-  return { route: null, reason: drivingResult.reason || walkingResult.reason, routeMode: "" };
-}
-
-async function computeRouteThroughWaypoints(apiKey, origin, destination, waypoints) {
-  const stops = [origin, ...waypoints, destination];
-  const segments = [];
-  let mergedRouteMode = "walking";
-  let lastReason = "";
-  for (let index = 1; index < stops.length; index++) {
-    const result = await computeRouteSegment(apiKey, stops[index - 1], stops[index]);
-    if (!result.route) {
-      return { route: null, reason: result.reason || "Waypoint route segment failed" };
-    }
-    if (result.routeMode !== "walking") {
-      mergedRouteMode = "walking_estimate";
-    }
-    lastReason = result.reason || lastReason;
-    segments.push(result.route);
-  }
-  return {
-    route: mergeRouteSegments(segments, mergedRouteMode),
-    reason: lastReason,
-  };
-}
-
-async function computeRouteWithKakaoWalkingApi(
+async function computeRouteWithKakaoMapWalkingApi(
   apiKey,
   originLatitude,
   originLongitude,
   destinationLatitude,
-  destinationLongitude
+  destinationLongitude,
+  waypoints,
+  routeMode
 ) {
   const params = new URLSearchParams({
-    origin: `${originLongitude},${originLatitude}`,
-    destination: `${destinationLongitude},${destinationLatitude}`,
-    priority: "DISTANCE",
-    summary: "false",
+    start_x: String(originLongitude),
+    start_y: String(originLatitude),
+    end_x: String(destinationLongitude),
+    end_y: String(destinationLatitude),
+    input_coord: "WGS84",
+    output_coord: "WGS84",
+    route_mode: routeMode,
   });
-  const kakaoResponse = await getJson(`https://apis-navi.kakaomobility.com/affiliate/walking/v1/directions?${params}`, {
+  if (waypoints.length > 0) {
+    params.set("via_x", waypoints.map((point) => point.longitude).join(","));
+    params.set("via_y", waypoints.map((point) => point.latitude).join(","));
+  }
+
+  const kakaoResponse = await getJson(`https://dapi.kakao.com/v2/routing/walk?${params}`, {
     Accept: "application/json",
     Authorization: `KakaoAK ${apiKey}`,
-    "Content-Type": "application/json",
-    service: optionalString(process.env.KAKAO_MOBILITY_SERVICE) || "safeway",
   });
-
   if (kakaoResponse.statusCode < 200 || kakaoResponse.statusCode >= 300) {
     return {
       route: null,
       reason:
         optionalString(kakaoResponse.json.msg) ||
         optionalString(kakaoResponse.json.message) ||
-        optionalString(kakaoResponse.json.result_message) ||
-        `Kakao Walking Directions request failed: ${kakaoResponse.statusCode}`,
+        `Kakao Map walking route request failed: ${kakaoResponse.statusCode}`,
     };
   }
 
-  const route = Array.isArray(kakaoResponse.json.routes) ? kakaoResponse.json.routes[0] : null;
-  const resultCode = route ? optionalNumber(route.result_code) : null;
-  if (!route || (resultCode !== null && resultCode !== 0)) {
+  if (optionalString(kakaoResponse.json.status) !== "OK" || !kakaoResponse.json.route) {
     return {
       route: null,
-      reason: (route && optionalString(route.result_message)) || "Kakao Walking Directions returned no route",
+      reason: optionalString(kakaoResponse.json.status) || "Kakao Map walking route returned no route",
     };
   }
 
-  const routeBody = buildKakaoRoute(route, "kakao_walking", "walking");
-  if (!routeBody) {
-    return { route: null, reason: "Kakao Walking Directions returned no route geometry" };
-  }
-
-  return {
-    route: routeBody,
-    reason: "",
-  };
-}
-
-async function computeRouteWithKakaoDrivingApi(
-  apiKey,
-  originLatitude,
-  originLongitude,
-  destinationLatitude,
-  destinationLongitude
-) {
-  const params = new URLSearchParams({
-    origin: `${originLongitude},${originLatitude}`,
-    destination: `${destinationLongitude},${destinationLatitude}`,
-    priority: "DISTANCE",
-    summary: "false",
-  });
-  const kakaoResponse = await getJson(`https://apis-navi.kakaomobility.com/v1/directions?${params}`, {
-    Accept: "application/json",
-    Authorization: `KakaoAK ${apiKey}`,
-    "Content-Type": "application/json",
-  });
-
-  if (kakaoResponse.statusCode < 200 || kakaoResponse.statusCode >= 300) {
-    return {
-      route: null,
-      reason:
-        optionalString(kakaoResponse.json.msg) ||
-        optionalString(kakaoResponse.json.message) ||
-        optionalString(kakaoResponse.json.result_message) ||
-        `Kakao Driving Directions request failed: ${kakaoResponse.statusCode}`,
-    };
-  }
-
-  const route = Array.isArray(kakaoResponse.json.routes) ? kakaoResponse.json.routes[0] : null;
-  const resultCode = route ? optionalNumber(route.result_code) : null;
-  if (!route || (resultCode !== null && resultCode !== 0)) {
-    return {
-      route: null,
-      reason: (route && optionalString(route.result_msg)) || "Kakao Driving Directions returned no route",
-    };
-  }
-
-  const routeBody = buildKakaoRoute(route, "kakao_driving", "driving");
-  if (!routeBody) {
-    return { route: null, reason: "Kakao Driving Directions returned no route geometry" };
-  }
-
-  return {
-    route: routeBody,
-    reason: "",
-  };
+  const routeBody = buildKakaoMapWalkingRoute(kakaoResponse.json.route, routeMode, waypoints.length);
+  return routeBody
+    ? { route: routeBody, reason: "" }
+    : { route: null, reason: "Kakao Map walking route returned no geometry" };
 }
 
 function getOpenAiModel() {
@@ -1153,6 +1005,7 @@ app.post("/routes/compute", async (req, res) => {
   const origin = req.body.origin || {};
   const destination = req.body.destination || {};
   const waypoints = parseWaypoints(req.body.waypoints);
+  const routeMode = parseRouteMode(req.body.routeMode);
   const originLatitude = optionalNumber(origin.latitude);
   const originLongitude = optionalNumber(origin.longitude);
   const destinationLatitude = optionalNumber(destination.latitude);
@@ -1169,47 +1022,17 @@ app.post("/routes/compute", async (req, res) => {
   }
 
   try {
-    if (waypoints.length > 0) {
-      const waypointResult = await computeRouteThroughWaypoints(
-        apiKey,
-        { latitude: originLatitude, longitude: originLongitude },
-        { latitude: destinationLatitude, longitude: destinationLongitude },
-        waypoints
-      );
-      if (waypointResult.route) {
-        res.json({
-          ...waypointResult.route,
-          waypointCount: waypoints.length,
-          waypointFallbackReason: waypointResult.reason,
-        });
-        return;
-      }
-    }
-
-    const walkingResult = await computeRouteWithKakaoWalkingApi(
+    const walkingResult = await computeRouteWithKakaoMapWalkingApi(
       apiKey,
       originLatitude,
       originLongitude,
       destinationLatitude,
-      destinationLongitude
+      destinationLongitude,
+      waypoints,
+      routeMode
     );
     if (walkingResult.route) {
       res.json(walkingResult.route);
-      return;
-    }
-
-    const drivingResult = await computeRouteWithKakaoDrivingApi(
-      apiKey,
-      originLatitude,
-      originLongitude,
-      destinationLatitude,
-      destinationLongitude
-    );
-    if (drivingResult.route) {
-      res.json({
-        ...withWalkingTimeEstimate(drivingResult.route),
-        walkingFallbackReason: walkingResult.reason,
-      });
       return;
     }
 
@@ -1219,14 +1042,14 @@ app.post("/routes/compute", async (req, res) => {
         originLongitude,
         destinationLatitude,
         destinationLongitude,
-        drivingResult.reason || walkingResult.reason
+        walkingResult.reason
       )
     );
   } catch (error) {
-    console.error("Kakao Mobility API failed", error);
+    console.error("Kakao Map walking route API failed", error);
     res.status(500).json({
       ok: false,
-      error: "Kakao Mobility API failed",
+      error: "Kakao Map walking route API failed",
       detail: error.message,
     });
   }

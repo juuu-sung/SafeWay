@@ -67,14 +67,14 @@ public class MainActivity extends AppCompatActivity {
     private static final String RETURN_NOTIFICATION_CHANNEL_ID = "safeway_return";
     private static final float WALKING_SPEED_METERS_PER_SECOND = 1.2f;
     private static final int WALKING_NAV_ZOOM_LEVEL = 17;
-    private static final float ROUTE_DEVIATION_THRESHOLD_METERS = 80f;
-    private static final int ROUTE_DEVIATION_CONFIRMATION_COUNT = 2;
-    private static final long ROUTE_DEVIATION_ALERT_COOLDOWN_MS = 5 * 60 * 1000L;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.KOREA);
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.KOREA);
 
+    private final SharedPreferences.OnSharedPreferenceChangeListener navigationListener = (p, key) -> {
+        if (SafeWayPrefs.NAV_STATE.equals(key)) renderWalkingRoutePanel();
+    };
     private SharedPreferences prefs;
     private AppDatabase db;
 
@@ -118,13 +118,6 @@ public class MainActivity extends AppCompatActivity {
     private List<LatLng> walkingRoutePoints = new ArrayList<>();
     private List<WalkingGuide> walkingGuides = new ArrayList<>();
     private boolean walkingMapStarted;
-    private boolean walkingLocationUpdatesActive;
-    private LocationListener walkingLocationListener;
-    private int routeDeviationHitCount;
-    private long lastRouteDeviationAlertMillis;
-    private boolean routeDeviationAlertInFlight;
-    private boolean routeDeviationActive;
-    private float routeDeviationDistanceMeters;
 
     private final Runnable timerRunnable = new Runnable() {
         @Override
@@ -165,6 +158,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        prefs.registerOnSharedPreferenceChangeListener(navigationListener);
         if (walkingMapStarted && walkingRouteMap != null) {
             walkingRouteMap.resume();
         }
@@ -176,7 +170,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onPause() {
-        stopWalkingLocationUpdates();
+        prefs.unregisterOnSharedPreferenceChangeListener(navigationListener);
         if (walkingMapStarted && walkingRouteMap != null) {
             walkingRouteMap.pause();
         }
@@ -284,8 +278,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startReturnAndShowLocationNotification() {
+        if (!prefs.getBoolean(SafeWayPrefs.ROUTE_NAVIGABLE, false)) {
+            Toast.makeText(this, "실제 도보 경로를 먼저 계산해주세요.", Toast.LENGTH_LONG).show();
+            return;
+        }
         int expectedMinutes = getRouteExpectedMinutes();
         prefs.edit()
+                .remove(SafeWayPrefs.NAV_STATE)
+                .remove(SafeWayPrefs.NAV_ALERT_TIME)
                 .putBoolean(SafeWayPrefs.RETURNING, true)
                 .putLong(SafeWayPrefs.START_TIME, System.currentTimeMillis())
                 .putInt(SafeWayPrefs.EXPECTED_MINUTES, expectedMinutes)
@@ -296,7 +296,6 @@ public class MainActivity extends AppCompatActivity {
         ReturnTrackRecorder.reset(this);
         recordBestKnownReturnLocation();
         startReturnLocationService();
-        resetRouteDeviationState();
         Toast.makeText(this, "안심귀가를 시작했습니다.", Toast.LENGTH_SHORT).show();
         updateStateUi();
         renderWalkingRoutePanel();
@@ -349,8 +348,6 @@ public class MainActivity extends AppCompatActivity {
 
         Toast.makeText(this, "귀가 기록이 저장되었습니다.", Toast.LENGTH_SHORT).show();
         cancelReturnNotification();
-        resetRouteDeviationState();
-        stopWalkingLocationUpdates();
         updateStateUi();
     }
 
@@ -528,7 +525,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void openFullWalkingNaviFromWalkingPanel() {
         if (!prefs.getBoolean(SafeWayPrefs.RETURNING, false)) {
-            Toast.makeText(this, "안심귀가 시작 후 전체화면 도보 내비를 열 수 있습니다.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "안심귀가 시작 후 전체화면 도보 안내를 열 수 있습니다.", Toast.LENGTH_SHORT).show();
             return;
         }
         if (!hasLocationPermission()) {
@@ -664,7 +661,9 @@ public class MainActivity extends AppCompatActivity {
         walkingDestinationLatLng = getStoredDestinationLatLng();
         walkingRoutePoints = getStoredRoutePoints();
         walkingGuides = getStoredWalkingGuides();
-        LatLng latestLocation = getCurrentLocationLatLng();
+        JSONObject navState = WalkingNavigationState.read(prefs);
+        LatLng latestLocation = navState.has("latitude")
+                ? LatLng.from(navState.optDouble("latitude"), navState.optDouble("longitude")) : null;
         if (latestLocation != null) {
             walkingCurrentLatLng = latestLocation;
         }
@@ -708,129 +707,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateWalkingNavigationStatus() {
-        if (walkingNavInstructionText == null || walkingNavMetaText == null) {
-            return;
-        }
-        if (walkingDestinationLatLng == null) {
-            walkingNavInstructionText.setText("도착지를 먼저 설정하세요.");
-            walkingNavMetaText.setText("경로 다시 설정에서 도착지를 선택하면 도보 네비가 시작됩니다.");
-            walkingNavDistanceText.setText("-");
-            walkingNavEtaText.setText("-");
-            return;
-        }
-        if (walkingCurrentLatLng == null) {
-            walkingNavInstructionText.setText("현재 위치를 확인하는 중입니다.");
-            walkingNavMetaText.setText("위치 권한과 GPS가 켜져 있어야 도보 네비가 갱신됩니다.");
-            walkingNavDistanceText.setText("-");
-            walkingNavEtaText.setText("-");
-            return;
-        }
+        JSONObject state = WalkingNavigationState.read(prefs);
+        walkingNavInstructionText.setText(state.optString("instruction", "현재 위치를 확인하는 중입니다."));
+        walkingNavMetaText.setText(state.optString("detail", "정확한 GPS 신호를 기다립니다."));
+        walkingNavDistanceText.setText(WalkingNavigationState.distance(state.optDouble("remaining", -1)));
+        walkingNavEtaText.setText(WalkingNavigationState.minutes(state.optDouble("seconds", -1)));
 
-        List<LatLng> route = walkingRoutePoints == null ? new ArrayList<>() : walkingRoutePoints;
-        if (route.size() < 2) {
-            route = new ArrayList<>();
-            route.add(walkingCurrentLatLng);
-            route.add(walkingDestinationLatLng);
-        }
-
-        if (routeDeviationActive) {
-            walkingNavInstructionText.setText("경로를 벗어난 것 같아요.");
-            walkingNavMetaText.setText(formatDistance(routeDeviationDistanceMeters) + " 이탈 · 보호자에게 알림을 보냅니다.");
-            walkingNavDistanceText.setText(formatDistance(routeDeviationDistanceMeters));
-            walkingNavEtaText.setText("확인 필요");
-            return;
-        }
-
-        int nearestIndex = findNearestRoutePointIndex(walkingCurrentLatLng, route);
-        int nextIndex = findNextRoutePointIndex(walkingCurrentLatLng, route, nearestIndex);
-        LatLng nextPoint = route.get(nextIndex);
-        float nextDistanceMeters = distanceMeters(walkingCurrentLatLng, nextPoint);
-        float remainingMeters = estimateRemainingWalkingDistance(walkingCurrentLatLng, route, nextIndex);
-        WalkingGuide nextGuide = findNextWalkingGuide(walkingCurrentLatLng, route, nearestIndex);
-
-        if (remainingMeters <= 30f || distanceMeters(walkingCurrentLatLng, walkingDestinationLatLng) <= 30f) {
-            walkingNavInstructionText.setText("도착지 근처입니다.");
-            walkingNavMetaText.setText("주변을 확인한 뒤 귀가 완료 버튼을 눌러주세요.");
-            walkingNavDistanceText.setText("30m 이내");
-            walkingNavEtaText.setText("곧 도착");
-            return;
-        }
-
-        if (nextGuide != null) {
-            float guideDistanceMeters = distanceMeters(walkingCurrentLatLng, nextGuide.position);
-            walkingNavInstructionText.setText(nextGuide.text);
-            walkingNavMetaText.setText(formatDistance(guideDistanceMeters) + " 후 안내 · 도보 네비");
-        } else {
-            walkingNavInstructionText.setText("경로를 따라 " + formatDistance(nextDistanceMeters) + " 이동");
-            walkingNavMetaText.setText(describeBearing(walkingCurrentLatLng, nextPoint) + " 방향 · 도보 네비");
-        }
-        walkingNavDistanceText.setText(formatDistance(remainingMeters));
-        walkingNavEtaText.setText(formatWalkingMinutes(remainingMeters));
-    }
-
-    private WalkingGuide findNextWalkingGuide(LatLng current, List<LatLng> route, int nearestIndex) {
-        if (walkingGuides == null || walkingGuides.isEmpty() || route == null || route.size() < 2) {
-            return null;
-        }
-        WalkingGuide bestGuide = null;
-        int bestRouteIndex = Integer.MAX_VALUE;
-        float bestDistance = Float.MAX_VALUE;
-        for (WalkingGuide guide : walkingGuides) {
-            if (guide == null || guide.position == null) {
-                continue;
-            }
-            float distance = distanceMeters(current, guide.position);
-            if (distance < 12f) {
-                continue;
-            }
-            int routeIndex = findNearestRoutePointIndex(guide.position, route);
-            if (routeIndex < nearestIndex) {
-                continue;
-            }
-            if (routeIndex < bestRouteIndex || (routeIndex == bestRouteIndex && distance < bestDistance)) {
-                bestGuide = guide;
-                bestRouteIndex = routeIndex;
-                bestDistance = distance;
-            }
-        }
-        return bestGuide;
-    }
-
-    private int findNearestRoutePointIndex(LatLng current, List<LatLng> route) {
-        int nearestIndex = 0;
-        float nearestDistance = Float.MAX_VALUE;
-        for (int i = 0; i < route.size(); i++) {
-            LatLng point = route.get(i);
-            if (point == null) {
-                continue;
-            }
-            float distance = distanceMeters(current, point);
-            if (distance < nearestDistance) {
-                nearestDistance = distance;
-                nearestIndex = i;
-            }
-        }
-        return nearestIndex;
-    }
-
-    private int findNextRoutePointIndex(LatLng current, List<LatLng> route, int nearestIndex) {
-        int nextIndex = Math.min(Math.max(nearestIndex + 1, 1), route.size() - 1);
-        while (nextIndex < route.size() - 1 && distanceMeters(current, route.get(nextIndex)) < 15f) {
-            nextIndex++;
-        }
-        return nextIndex;
-    }
-
-    private float estimateRemainingWalkingDistance(LatLng current, List<LatLng> route, int nextIndex) {
-        if (route == null || route.isEmpty()) {
-            return walkingDestinationLatLng == null ? 0f : distanceMeters(current, walkingDestinationLatLng);
-        }
-        int safeNextIndex = Math.min(Math.max(nextIndex, 0), route.size() - 1);
-        float total = distanceMeters(current, route.get(safeNextIndex));
-        for (int i = safeNextIndex; i + 1 < route.size(); i++) {
-            total += distanceMeters(route.get(i), route.get(i + 1));
-        }
-        return total;
     }
 
     private float distanceMeters(LatLng from, LatLng to) {
@@ -840,127 +722,6 @@ public class MainActivity extends AppCompatActivity {
         float[] results = new float[1];
         Location.distanceBetween(from.latitude, from.longitude, to.latitude, to.longitude, results);
         return Math.max(0f, results[0]);
-    }
-
-    private void checkRouteDeviation(Location location) {
-        if (!prefs.getBoolean(SafeWayPrefs.RETURNING, false) || location == null) {
-            resetRouteDeviationState();
-            return;
-        }
-        List<LatLng> route = walkingRoutePoints;
-        if (route == null || route.size() < 2) {
-            route = getStoredRoutePoints();
-        }
-        if (route == null || route.size() < 2) {
-            resetRouteDeviationState();
-            return;
-        }
-
-        LatLng current = LatLng.from(location.getLatitude(), location.getLongitude());
-        LatLng destination = walkingDestinationLatLng != null ? walkingDestinationLatLng : getStoredDestinationLatLng();
-        if (destination != null && distanceMeters(current, destination) <= 40f) {
-            resetRouteDeviationState();
-            return;
-        }
-
-        float distanceFromRoute = distanceToRouteMeters(current, route);
-        routeDeviationActive = distanceFromRoute > ROUTE_DEVIATION_THRESHOLD_METERS;
-        routeDeviationDistanceMeters = distanceFromRoute;
-        if (!routeDeviationActive) {
-            routeDeviationHitCount = 0;
-            return;
-        }
-
-        routeDeviationHitCount++;
-        long now = System.currentTimeMillis();
-        boolean cooldownPassed = now - lastRouteDeviationAlertMillis >= ROUTE_DEVIATION_ALERT_COOLDOWN_MS;
-        if (routeDeviationHitCount >= ROUTE_DEVIATION_CONFIRMATION_COUNT
-                && cooldownPassed
-                && !routeDeviationAlertInFlight) {
-            routeDeviationAlertInFlight = true;
-            int roundedDistance = Math.max(1, Math.round(distanceFromRoute));
-            PushAlertClient.sendRouteDeviation(this, location, roundedDistance, (sent, message) -> {
-                routeDeviationAlertInFlight = false;
-                if (sent) {
-                    lastRouteDeviationAlertMillis = System.currentTimeMillis();
-                    Toast.makeText(this, "경로 이탈을 감지해 보호자에게 알렸습니다.", Toast.LENGTH_LONG).show();
-                }
-            });
-        }
-    }
-
-    private float distanceToRouteMeters(LatLng point, List<LatLng> route) {
-        if (point == null || route == null || route.size() < 2) {
-            return 0f;
-        }
-        float minDistance = Float.MAX_VALUE;
-        for (int i = 0; i + 1 < route.size(); i++) {
-            LatLng start = route.get(i);
-            LatLng end = route.get(i + 1);
-            if (start == null || end == null) {
-                continue;
-            }
-            minDistance = Math.min(minDistance, distanceToSegmentMeters(point, start, end));
-        }
-        return minDistance == Float.MAX_VALUE ? 0f : minDistance;
-    }
-
-    private float distanceToSegmentMeters(LatLng point, LatLng start, LatLng end) {
-        double metersPerDegreeLat = 111_320.0;
-        double metersPerDegreeLng = metersPerDegreeLat * Math.cos(Math.toRadians(point.latitude));
-        double pointX = point.longitude * metersPerDegreeLng;
-        double pointY = point.latitude * metersPerDegreeLat;
-        double startX = start.longitude * metersPerDegreeLng;
-        double startY = start.latitude * metersPerDegreeLat;
-        double endX = end.longitude * metersPerDegreeLng;
-        double endY = end.latitude * metersPerDegreeLat;
-
-        double segmentX = endX - startX;
-        double segmentY = endY - startY;
-        double segmentLengthSquared = segmentX * segmentX + segmentY * segmentY;
-        if (segmentLengthSquared == 0) {
-            return distanceMeters(point, start);
-        }
-        double projection = ((pointX - startX) * segmentX + (pointY - startY) * segmentY) / segmentLengthSquared;
-        projection = Math.max(0.0, Math.min(1.0, projection));
-        double closestX = startX + projection * segmentX;
-        double closestY = startY + projection * segmentY;
-        double deltaX = pointX - closestX;
-        double deltaY = pointY - closestY;
-        return (float) Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-    }
-
-    private void resetRouteDeviationState() {
-        routeDeviationHitCount = 0;
-        routeDeviationAlertInFlight = false;
-        routeDeviationActive = false;
-        routeDeviationDistanceMeters = 0f;
-    }
-
-    private String describeBearing(LatLng from, LatLng to) {
-        float bearing = bearingDegrees(from, to);
-        if (bearing < 22.5f || bearing >= 337.5f) {
-            return "북쪽";
-        }
-        if (bearing < 67.5f) {
-            return "북동쪽";
-        }
-        if (bearing < 112.5f) {
-            return "동쪽";
-        }
-        if (bearing < 157.5f) {
-            return "남동쪽";
-        }
-        if (bearing < 202.5f) {
-            return "남쪽";
-        }
-        if (bearing < 247.5f) {
-            return "남서쪽";
-        }
-        if (bearing < 292.5f) {
-            return "서쪽";
-        }
-        return "북서쪽";
     }
 
     private float bearingDegrees(LatLng from, LatLng to) {
@@ -980,11 +741,6 @@ public class MainActivity extends AppCompatActivity {
         return Math.max(1, Math.round(meters)) + "m";
     }
 
-    private String formatWalkingMinutes(float meters) {
-        int minutes = Math.max(1, Math.round((meters / WALKING_SPEED_METERS_PER_SECOND) / 60f));
-        return minutes + "분";
-    }
-
     private void renderWalkingMap() {
         if (walkingKakaoMap == null) {
             return;
@@ -992,7 +748,8 @@ public class MainActivity extends AppCompatActivity {
         walkingKakaoMap.getLabelManager().getLayer().removeAll();
         walkingKakaoMap.getRouteLineManager().getLayer().removeAll();
 
-        boolean navigationMode = prefs.getBoolean(SafeWayPrefs.RETURNING, false) && walkingCurrentLatLng != null;
+        boolean navigationMode = prefs.getBoolean(SafeWayPrefs.RETURNING, false) && walkingCurrentLatLng != null
+                && WalkingNavigationState.read(prefs).optBoolean("guidance");
         List<LatLng> routeToDraw = navigationMode ? getRemainingWalkingRoutePoints() : walkingRoutePoints;
         List<LatLng> boundsPoints = new ArrayList<>();
         Label currentLocationLabel = null;
@@ -1005,7 +762,8 @@ public class MainActivity extends AppCompatActivity {
             boundsPoints.add(walkingDestinationLatLng);
         }
         if (routeToDraw != null && routeToDraw.size() >= 2) {
-            addWalkingRouteLine(routeToDraw);
+            addWalkingRouteLine(walkingRoutePoints, ContextCompat.getColor(this, R.color.safeway_muted));
+            if (navigationMode) addWalkingRouteLine(routeToDraw, ContextCompat.getColor(this, R.color.safeway_teal));
             boundsPoints.addAll(routeToDraw);
         }
         List<LatLng> dangerPoints = addWalkingDangerMemoMarkers();
@@ -1030,29 +788,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private List<LatLng> getRemainingWalkingRoutePoints() {
+        JSONObject state = WalkingNavigationState.read(prefs);
+        if (!state.optBoolean("guidance") || walkingCurrentLatLng == null || walkingRoutePoints.size() < 2) return walkingRoutePoints;
         List<LatLng> remaining = new ArrayList<>();
-        if (walkingCurrentLatLng == null) {
-            return walkingRoutePoints;
-        }
-        if (walkingRoutePoints == null || walkingRoutePoints.size() < 2) {
-            if (walkingDestinationLatLng != null) {
-                remaining.add(walkingCurrentLatLng);
-                remaining.add(walkingDestinationLatLng);
-            }
-            return remaining;
-        }
-        int nearestIndex = findNearestRoutePointIndex(walkingCurrentLatLng, walkingRoutePoints);
-        int nextIndex = findNextRoutePointIndex(walkingCurrentLatLng, walkingRoutePoints, nearestIndex);
+        int next = Math.min(walkingRoutePoints.size() - 1, Math.max(1, state.optInt("segment", 0) + 1));
         remaining.add(walkingCurrentLatLng);
-        for (int i = nextIndex; i < walkingRoutePoints.size(); i++) {
-            LatLng point = walkingRoutePoints.get(i);
-            if (point != null) {
-                remaining.add(point);
-            }
-        }
-        if (remaining.size() < 2 && walkingDestinationLatLng != null) {
-            remaining.add(walkingDestinationLatLng);
-        }
+        remaining.addAll(walkingRoutePoints.subList(next, walkingRoutePoints.size()));
         return remaining;
     }
 
@@ -1138,9 +879,8 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void addWalkingRouteLine(List<LatLng> points) {
+    private void addWalkingRouteLine(List<LatLng> points, int color) {
         RouteLineLayer layer = walkingKakaoMap.getRouteLineManager().getLayer();
-        int color = ContextCompat.getColor(this, R.color.safeway_teal);
         RouteLineStylesSet stylesSet = RouteLineStylesSet.from(
                 RouteLineStyles.from(RouteLineStyle.from(dp(6), color))
         );
@@ -1150,63 +890,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startWalkingLocationUpdatesIfNeeded() {
-        if (!prefs.getBoolean(SafeWayPrefs.RETURNING, false) || walkingLocationUpdatesActive || !hasLocationPermission()) {
-            return;
+        if (prefs.getBoolean(SafeWayPrefs.RETURNING, false) && hasLocationPermission()) {
+            ContextCompat.startForegroundService(this, new Intent(this, ReturnLocationService.class));
         }
-        LocationManager locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-        if (locationManager == null) {
-            return;
-        }
-        String provider = getWalkingLocationProvider(locationManager);
-        if (provider == null) {
-            return;
-        }
-        walkingLocationListener = new LocationListener() {
-            @Override
-            public void onLocationChanged(Location location) {
-                walkingCurrentLatLng = LatLng.from(location.getLatitude(), location.getLongitude());
-                ReturnTrackRecorder.record(MainActivity.this, location);
-                checkRouteDeviation(location);
-                renderWalkingRoutePanel();
-            }
-
-            @Override
-            public void onProviderEnabled(String provider) {
-            }
-
-            @Override
-            public void onProviderDisabled(String provider) {
-            }
-
-            @Override
-            public void onStatusChanged(String provider, int status, Bundle extras) {
-            }
-        };
-        try {
-            locationManager.requestLocationUpdates(provider, 3000L, 5f, walkingLocationListener, Looper.getMainLooper());
-            walkingLocationUpdatesActive = true;
-        } catch (SecurityException ignored) {
-            walkingLocationListener = null;
-            walkingLocationUpdatesActive = false;
-        }
-    }
-
-    private void stopWalkingLocationUpdates() {
-        if (!walkingLocationUpdatesActive || walkingLocationListener == null) {
-            walkingLocationUpdatesActive = false;
-            walkingLocationListener = null;
-            return;
-        }
-        LocationManager locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-        if (locationManager != null) {
-            try {
-                locationManager.removeUpdates(walkingLocationListener);
-            } catch (SecurityException ignored) {
-                // Location permission may have been revoked while the screen was open.
-            }
-        }
-        walkingLocationUpdatesActive = false;
-        walkingLocationListener = null;
     }
 
     private String getWalkingLocationProvider(LocationManager locationManager) {
@@ -1273,7 +959,7 @@ public class MainActivity extends AppCompatActivity {
                 startWalkingLocationUpdatesIfNeeded();
                 openFullWalkingNaviFromWalkingPanel();
             } else {
-                Toast.makeText(this, "위치 권한이 없어 전체화면 도보 내비를 열 수 없습니다.", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "위치 권한이 없어 전체화면 도보 안내를 열 수 없습니다.", Toast.LENGTH_LONG).show();
             }
         }
     }
@@ -1470,7 +1156,6 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
-        stopWalkingLocationUpdates();
         if (emergencySoundPlayer != null) {
             emergencySoundPlayer.release();
         }
